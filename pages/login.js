@@ -9,6 +9,8 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwuGx0sBkvJMjP7cAmpT3uagpsTb6BT0i7Yqw0dLA2iq86Oh2ubSVxghIHSuE8gnB8A2Q/exec";
+
 
   // If user already saved, pre-fill username
   useEffect(() => {
@@ -55,9 +57,23 @@ export default function LoginPage() {
         "rr_user",
         JSON.stringify({ username: data.username })
       );
+      try {
+  const url = `${SCRIPT_URL}?action=getUserVotes&user=${encodeURIComponent(username)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data && data.success && data.votes) {
+    const key = `rr_votes_${username}`;
+    window.localStorage.setItem(key, JSON.stringify(data.votes));
+  }
+} catch (err) {
+  console.error("Failed to fetch user votes", err);
+}
     }
 
     setInfo("Logged in successfully.");
+    window.location.href = `/rpdr-18/user/${encodeURIComponent(username)}`;
+
 
     setTimeout(() => {
       router.push("/");
