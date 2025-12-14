@@ -1,0 +1,53 @@
+/* Reset & box sizing */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Make page fill window, dark background everywhere */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+ background-color: #120902;  /* deep bronze-brown */
+  color: #fef7e8;             /* warm off-white text */
+  overflow-x: hidden;
+}
+
+/* Next.js root */
+#__next {
+  min-height: 100vh;
+  background-color: #120902;  /* ensure root matches */
+}
+
+/* Base text styling */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Global link reset */
+a {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+/* Make sure visited links don’t change color */
+a:visited {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+/* Inside look cards, keep link text white, no underline */
+.look-card a {
+  color: #fef7e8 !important;
+  text-decoration: none !important;
+}
+
