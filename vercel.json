@@ -1,15 +1,5 @@
 {
   "redirects": [
-    {
-      "source": "/",
-      "destination": "/rpdr-18",
-      "permanent": true
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/rpdr-18",
-      "destination": "/"
-    }
+    { "source": "/", "destination": "/rpdr-18", "permanent": true }
   ]
 }
