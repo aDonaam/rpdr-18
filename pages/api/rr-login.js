@@ -38,14 +38,14 @@ export default async function handler(req, res) {
     }
 
     const cleanCell = (s) =>
-  String(s || "")
-    .replace(/^\uFEFF/, "")     // remove BOM if present
-    .replace(/^"|"$/g, "")      // strip surrounding quotes
-    .trim();
+      String(s || "")
+        .replace(/^\uFEFF/, "")     // remove BOM if present
+        .replace(/^"|"$/g, "")      // strip surrounding quotes
+        .trim();
 
-const header = lines[0].split(",").map((h) => cleanCell(h).toLowerCase());
-const usernameCol = header.indexOf("username");
-const pinCol = header.indexOf("pin");
+    const header = lines[0].split(",").map((h) => cleanCell(h).toLowerCase());
+    const usernameCol = header.indexOf("username");
+    const pinCol = header.indexOf("pin");
 
     if (usernameCol === -1 || pinCol === -1) {
       res.status(500).json({
@@ -63,7 +63,7 @@ const pinCol = header.indexOf("pin");
 
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(",").map(cleanCell);
-const u = (cols[usernameCol] || "").trim();
+      const u = (cols[usernameCol] || "").trim();
 
       if (u === trimmedUser) {
         matchingRow = cols;

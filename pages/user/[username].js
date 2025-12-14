@@ -21,6 +21,20 @@ export default function UserRankingsPage({ username, rows }) {
     <div style={styles.page}>
       <header style={styles.header}>
         <h1 style={styles.title}>{title}</h1>
+        <div>
+          {user ? (
+            <div style={styles.userBox}>
+              <span>Logged in as: {user.username}</span>{" "}
+              <Link href="/logout" style={styles.link}>
+                (log out)
+              </Link>
+            </div>
+          ) : (
+            <Link href="/login" style={styles.link}>
+              Log in with PIN
+            </Link>
+          )}
+        </div>
         <p style={styles.subtitle}>
           Queens are ranked only by <b>{username}</b>&apos;s votes across all
           looks.

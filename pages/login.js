@@ -34,11 +34,16 @@ export default function LoginPage() {
     setInfo("");
 
     try {
-      const res = await fetch(`${router.basePath}/api/rr-login`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ username, pin }),
-});
+      const res = await fetch("/api/rr-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          pin,
+        }),
+      });
 
       const data = await res.json();
 
@@ -66,7 +71,7 @@ export default function LoginPage() {
         }
       }
 
-      setInfo("Logged in successfully.");
+      setInfo("Logged in successfully. Redirecting...");
       window.location.href = `/rpdr-18/user/${encodeURIComponent(username)}`;
 
 
