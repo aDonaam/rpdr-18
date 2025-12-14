@@ -35,10 +35,10 @@ export default function LoginPage() {
 
     try {
       const res = await fetch(`${router.basePath}/api/rr-login`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ username, pin }),
-});
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, pin }),
+      });
 
       const data = await res.json();
 
@@ -52,107 +52,101 @@ export default function LoginPage() {
           "rr_user",
           JSON.stringify({ username: data.username })
         );
+        // success: store user
+        window.localStorage.setItem("rr_user", JSON.stringify({ username }));
         window.dispatchEvent(new Event("rr-auth-changed"));
 
+        // rehydrate votes (if you already have this, keep it here)
         try {
           const url = `${SCRIPT_URL}?action=getUserVotes&user=${encodeURIComponent(username)}`;
-          const res = await fetch(url);
-          const data = await res.json();
+          const res2 = await fetch(url);
+          const data2 = await res2.json();
 
-          if (data && data.success && data.votes) {
-            const key = `rr_votes_${username}`;
-            window.localStorage.setItem(key, JSON.stringify(data.votes));
+          if (data2 && data2.success && data2.votes) {
+            window.localStorage.setItem(`rr_votes_${username}`, JSON.stringify(data2.votes));
           }
         } catch (err) {
           console.error("Failed to fetch user votes", err);
         }
+
+        // ✅ ONE redirect, and it goes straight to the user page
+        window.location.replace(`/rpdr-18/user/${encodeURIComponent(username)}`);
+        return;
+
       }
 
-      setInfo("Logged in successfully. Redirecting...");
-      window.location.href = `/rpdr-18/user/${encodeURIComponent(username)}`;
+
+      const containerStyle = {
+        padding: "40px",
+        maxWidth: "480px",
+        margin: "40px auto",
+        color: "#fff",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      };
+
+      const inputStyle = {
+        width: "100%",
+        padding: "10px 12px",
+        marginTop: "4px",
+        marginBottom: "16px",
+        borderRadius: "999px",
+        border: "1px solid #555",
+        backgroundColor: "#1b1228",
+        color: "#fff",
+        outline: "none",
+      };
+
+      const buttonStyle = {
+        padding: "10px 20px",
+        borderRadius: "999px",
+        border: "none",
+        cursor: "pointer",
+        backgroundColor: "#4ade80",
+        fontWeight: 600,
+      };
+
+      const errorStyle = { color: "#f97373", marginTop: "8px" };
+      const infoStyle = { color: "#a5f3fc", marginTop: "8px" };
+
+      return (
+        <div style={containerStyle}>
+          <h1 style={{ fontSize: "24px", marginBottom: "12px" }}>Log in with PIN</h1>
+          <p style={{ fontSize: "14px", lineHeight: 1.5, marginBottom: "24px" }}>
+            Enter the username and PIN provided to you.
+            If you don&apos;t have an account yet, please contact Andrew to be added
+            to the project.
+          </p>
 
 
-      setTimeout(() => {
-        router.push("/");
-      }, 800);
-    } catch (err) {
-      console.error(err);
-      setError("Network error while logging in.");
+          <form onSubmit={handleSubmit}>
+            <label style={{ fontSize: "14px" }}>
+              Username
+              <input
+                style={inputStyle}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+
+            <label style={{ fontSize: "14px" }}>
+              PIN
+              <input
+                style={inputStyle}
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+
+            <button type="submit" style={buttonStyle}>
+              Continue
+            </button>
+
+            {error && <div style={errorStyle}>{error}</div>}
+            {info && <div style={infoStyle}>{info}</div>}
+          </form>
+        </div>
+      );
     }
-  }
-
-
-  const containerStyle = {
-    padding: "40px",
-    maxWidth: "480px",
-    margin: "40px auto",
-    color: "#fff",
-    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  };
-
-  const inputStyle = {
-    width: "100%",
-    padding: "10px 12px",
-    marginTop: "4px",
-    marginBottom: "16px",
-    borderRadius: "999px",
-    border: "1px solid #555",
-    backgroundColor: "#1b1228",
-    color: "#fff",
-    outline: "none",
-  };
-
-  const buttonStyle = {
-    padding: "10px 20px",
-    borderRadius: "999px",
-    border: "none",
-    cursor: "pointer",
-    backgroundColor: "#4ade80",
-    fontWeight: 600,
-  };
-
-  const errorStyle = { color: "#f97373", marginTop: "8px" };
-  const infoStyle = { color: "#a5f3fc", marginTop: "8px" };
-
-  return (
-    <div style={containerStyle}>
-      <h1 style={{ fontSize: "24px", marginBottom: "12px" }}>Log in with PIN</h1>
-      <p style={{ fontSize: "14px", lineHeight: 1.5, marginBottom: "24px" }}>
-        Enter the username and PIN provided to you.
-        If you don&apos;t have an account yet, please contact Andrew to be added
-        to the project.
-      </p>
-
-
-      <form onSubmit={handleSubmit}>
-        <label style={{ fontSize: "14px" }}>
-          Username
-          <input
-            style={inputStyle}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="off"
-          />
-        </label>
-
-        <label style={{ fontSize: "14px" }}>
-          PIN
-          <input
-            style={inputStyle}
-            type="password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            autoComplete="off"
-          />
-        </label>
-
-        <button type="submit" style={buttonStyle}>
-          Continue
-        </button>
-
-        {error && <div style={errorStyle}>{error}</div>}
-        {info && <div style={infoStyle}>{info}</div>}
-      </form>
-    </div>
-  );
-}
