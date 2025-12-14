@@ -111,20 +111,6 @@ export default function CategoryPage({ initialLooks, categoryName }) {
       <div style={styles.content}>
         <header style={styles.header}>
           <h1 style={styles.title}>{categoryName}</h1>
-          <div>
-          {user ? (
-            <div style={styles.userBox}>
-              <span>Logged in as: {user.username}</span>{" "}
-              <Link href="/logout" style={styles.link}>
-                (log out)
-              </Link>
-            </div>
-          ) : (
-            <Link href="/login" style={styles.link}>
-              Log in with PIN
-            </Link>
-          )}
-        </div>
         </header>
 
         <p style={styles.subtitle}>

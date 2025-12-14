@@ -121,21 +121,7 @@ return (
   <div style={styles.page}>
     <div style={styles.content}>
       <header style={styles.header}>
-        <h1 style={styles.title}>Season 18 Runway Review</h1>
-        <div>
-          {user ? (
-            <div style={styles.userBox}>
-              <span>Logged in as: {user.username}</span>{" "}
-              <Link href="/logout" style={styles.link}>
-                (log out)
-              </Link>
-            </div>
-          ) : (
-            <Link href="/login" style={styles.link}>
-              Log in with PIN
-            </Link>
-          )}
-        </div>
+        <h1 style={styles.title}>Season 18 Runway Review</h1>   
       </header>
 
       <p style={styles.subtitle}>Subtitle here if wanted

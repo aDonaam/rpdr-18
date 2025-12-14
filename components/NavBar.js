@@ -1,6 +1,7 @@
 // components/NavBar.js
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 
 export default function NavBar() {
   const [user, setUser] = useState(null);
@@ -141,6 +142,21 @@ export default function NavBar() {
   </Link>
 )}
       </nav>
+      <div style={styles.authBox}>
+  {user ? (
+    <>
+      <span style={styles.authText}>Logged in as: {user.username}</span>
+      <Link href="/logout" style={styles.authLink}>
+        (log out)
+      </Link>
+    </>
+  ) : (
+    <Link href="/login" style={styles.authLink}>
+      Log in with PIN
+    </Link>
+  )}
+</div>
+
     </header>
   );
 }
@@ -237,4 +253,22 @@ const styles = {
     fontSize: "14px",
     whiteSpace: "nowrap",
   },
+  authBox: {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  fontSize: "13px",
+  opacity: 0.95,
+  whiteSpace: "nowrap",
+},
+authText: {
+  opacity: 0.9,
+},
+authLink: {
+  color: "inherit",
+  textDecoration: "none",
+  cursor: "pointer",
+  fontWeight: 600,
+},
+
 };
