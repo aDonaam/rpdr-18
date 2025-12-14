@@ -34,16 +34,11 @@ export default function LoginPage() {
     setInfo("");
 
     try {
-      const res = await fetch("/api/rr-login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          pin,
-        }),
-      });
+      const res = await fetch(`${router.basePath}/api/rr-login`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username, pin }),
+});
 
       const data = await res.json();
 
