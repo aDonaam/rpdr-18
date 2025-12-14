@@ -4,6 +4,29 @@ import Link from "next/link";
 
 export default function NavBar() {
   const [user, setUser] = useState(null);
+
+  useEffect(() => {
+  const readUser = () => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem("rr_user");
+    setUser(raw ? JSON.parse(raw) : null);
+  };
+
+  readUser();
+
+  // update when other tabs change auth
+  window.addEventListener("storage", readUser);
+
+  // update when this tab logs in/out
+  window.addEventListener("rr-auth-changed", readUser);
+
+  return () => {
+    window.removeEventListener("storage", readUser);
+    window.removeEventListener("rr-auth-changed", readUser);
+  };
+}, []);
+
+
   const [queens, setQueens] = useState([]);
   const [categories, setCategories] = useState([]);
   const [openMenu, setOpenMenu] = useState(null); // "queens" | "categories" | null

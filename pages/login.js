@@ -52,6 +52,8 @@ export default function LoginPage() {
           "rr_user",
           JSON.stringify({ username: data.username })
         );
+        window.dispatchEvent(new Event("rr-auth-changed"));
+
         try {
           const url = `${SCRIPT_URL}?action=getUserVotes&user=${encodeURIComponent(username)}`;
           const res = await fetch(url);
