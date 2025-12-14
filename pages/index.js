@@ -111,20 +111,6 @@ export default function Home({ queens }) {
         <h1 style={styles.title}>
           Season 18 Queens Public Approval Leaderboard
         </h1>
-        <div>
-          {user ? (
-            <div style={styles.userBox}>
-              <span>Logged in as: {user.username}</span>{" "}
-              <Link href="/logout" style={styles.link}>
-                (log out)
-              </Link>
-            </div>
-          ) : (
-            <Link href="/login" style={styles.link}>
-              Log in with PIN
-            </Link>
-          )}
-        </div>
       </header>
 
       <p style={styles.subtitle}>
