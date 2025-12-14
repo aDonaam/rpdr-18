@@ -29,60 +29,55 @@ export default function LoginPage() {
   }, []);
 
   async function handleSubmit(e) {
-  e.preventDefault();
-  setError("");
-  setInfo("");
+    e.preventDefault();
+    setError("");
+    setInfo("");
 
-  try {
-    const res = await fetch("/api/rr-login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username,
-        pin,
-      }),
-    });
+    try {
+      const res = await fetch(`${router.basePath}/api/rr-login`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username, pin }),
+});
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!data.success) {
-      setError(data.error || "Login failed.");
-      return;
+      if (!data.success) {
+        setError(data.error || "Login failed.");
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "rr_user",
+          JSON.stringify({ username: data.username })
+        );
+        try {
+          const url = `${SCRIPT_URL}?action=getUserVotes&user=${encodeURIComponent(username)}`;
+          const res = await fetch(url);
+          const data = await res.json();
+
+          if (data && data.success && data.votes) {
+            const key = `rr_votes_${username}`;
+            window.localStorage.setItem(key, JSON.stringify(data.votes));
+          }
+        } catch (err) {
+          console.error("Failed to fetch user votes", err);
+        }
+      }
+
+      setInfo("Logged in successfully.");
+      window.location.href = `/rpdr-18/user/${encodeURIComponent(username)}`;
+
+
+      setTimeout(() => {
+        router.push("/");
+      }, 800);
+    } catch (err) {
+      console.error(err);
+      setError("Network error while logging in.");
     }
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem(
-        "rr_user",
-        JSON.stringify({ username: data.username })
-      );
-      try {
-  const url = `${SCRIPT_URL}?action=getUserVotes&user=${encodeURIComponent(username)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if (data && data.success && data.votes) {
-    const key = `rr_votes_${username}`;
-    window.localStorage.setItem(key, JSON.stringify(data.votes));
   }
-} catch (err) {
-  console.error("Failed to fetch user votes", err);
-}
-    }
-
-    setInfo("Logged in successfully.");
-    window.location.href = `/rpdr-18/user/${encodeURIComponent(username)}`;
-
-
-    setTimeout(() => {
-      router.push("/");
-    }, 800);
-  } catch (err) {
-    console.error(err);
-    setError("Network error while logging in.");
-  }
-}
 
 
   const containerStyle = {
@@ -121,10 +116,10 @@ export default function LoginPage() {
     <div style={containerStyle}>
       <h1 style={{ fontSize: "24px", marginBottom: "12px" }}>Log in with PIN</h1>
       <p style={{ fontSize: "14px", lineHeight: 1.5, marginBottom: "24px" }}>
-  Enter the username and PIN provided to you.
-  If you don&apos;t have an account yet, please contact Andrew to be added
-  to the project.
-</p>
+        Enter the username and PIN provided to you.
+        If you don&apos;t have an account yet, please contact Andrew to be added
+        to the project.
+      </p>
 
 
       <form onSubmit={handleSubmit}>
