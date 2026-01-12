@@ -6,6 +6,7 @@ import Link from "next/link";
 import LookCard from "../../components/LookCard";
 
 
+
 function slugify(str) {
   return (str || "")
     .toLowerCase()

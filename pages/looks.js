@@ -146,53 +146,57 @@ return (
 
 // Server-side fetch of CSV
 export async function getServerSideProps() {
-  const looksUrl = csvUrl(LOOKS_GID);
-  const votesUrl = csvUrl(VOTES_GID);
+  const { data, error } = await supabase
+    .from("looks")
+    .select("look_id, queen, category, image_url, avg_toot_pct, total_votes")
+    .order("queen", { ascending: true });
 
-  const [looksRes, votesRes] = await Promise.all([
-    fetch(looksUrl),
-    fetch(votesUrl),
-  ]);
+  if (error) {
+    console.error("Supabase error:", error);
+    return { props: { initialLooks: [] } };
+  }
 
-  const looksText = await looksRes.text();
-  const votesText = await votesRes.text();
+  const looks = (data || []).map((row) => ({
+    look_id: row.look_id,
+    queen: row.queen,
+    category: row.category,
+    image_url: row.image_url,
+    overallApproval: row.avg_toot_pct ?? null,
+    overallVoteCount: row.total_votes ?? 0,
 
-  // --- PARSE LOOKS ---
-  const looksResult = Papa.parse(looksText, {
-    header: true,
-    skipEmptyLines: true,
-  });
 
-  const looks = (looksResult.data || [])
-    .filter((row) => row.look_id && row.queen && row.category)
-    .map((row) => ({
-      look_id: row.look_id.trim(),
-      queen: row.queen.trim(),
-      category: row.category.trim(),
-      image_url: (row.image_url || "").trim(),
-    }));
 
-  // --- PARSE VOTES ---
-  const votesResult = Papa.parse(votesText, {
-    header: true,
-    skipEmptyLines: true,
-  });
 
-  const votes = (votesResult.data || []).filter(
-    (row) => row.look_id && row.user && row.vote
-  );
 
-  // --- ENRICH LOOKS WITH PUBLIC APPROVAL STATS ---
-  const looksWithApproval = enrichLooksWithApproval(looks, votes);
 
-  return {
-    props: {
-      initialLooks: looksWithApproval,
-    },
-  };
+
+
+
+
+  }));
+
+  return { props: { initialLooks: looks } };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
-
-
 
 // Inline styles for now (we'll convert to Tailwind later)
 const styles = {
