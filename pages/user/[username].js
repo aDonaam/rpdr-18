@@ -1,7 +1,6 @@
 // pages/user/[username].js
-import Papa from "papaparse";
 import { useRouter } from "next/router";
-import { csvUrl, LOOKS_GID, VOTES_GID } from "../../config";
+import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
 function slugify(str) {
   return (str || "")
@@ -10,22 +9,27 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
+function queenThumbSrc(contestant_name, basePath = "") {
+  return `${basePath}/thumbnails/queens/${slugify(contestant_name)}.png`;
+}
+
 export default function UserRankingsPage({ username, rows }) {
   const router = useRouter();
+  const basePath = router.basePath || "";
 
   const title = username
-    ? `${username}'s Season 18 Rankings`
-    : "Season 18 Rankings";
+    ? `${username} - Personal Leaderboard`
+    : "Personal Leaderboard";
 
   return (
     <div style={styles.page}>
       <header style={styles.header}>
         <h1 style={styles.title}>{title}</h1>
-        <p style={styles.subtitle}>
-          Queens are ranked only by <b>{username}</b>&apos;s votes across all
-          looks.
-        </p>
       </header>
+      <p style={styles.subtitle}>
+        Queens are ranked only by <b>{username}</b>&apos;s votes across all
+        looks.
+      </p>
 
       {rows.length === 0 && (
         <p style={styles.empty}>
@@ -39,45 +43,50 @@ export default function UserRankingsPage({ username, rows }) {
             <thead>
               <tr>
                 <th style={styles.rankCol}>Rank</th>
-                <th style={styles.imageCol}>Queen</th>
-                <th style={styles.nameCol}></th>
+                <th style={styles.imageCol}></th>
+                <th style={styles.nameCol}>Queen</th>
                 <th style={styles.approvalCol}>User approval</th>
                 <th style={styles.votesCol}>User votes</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((q) => (
-                <tr key={q.queen} style={styles.row}>
+                <tr key={q.contestant_name} style={styles.row}>
                   <td style={styles.rankCol}>{q.rank}</td>
-
                   <td style={styles.imageCol}>
                     {q.image_url ? (
                       <img
-                        src={q.image_url}
-                        alt={q.queen}
-                        style={styles.avatar}
+                        src={queenThumbSrc(q.contestant_name, basePath)}
+                        alt={`${q.contestant_name} thumbnail`}
+                        style={styles.thumb}
+                        onError={(e) => {
+                          e.currentTarget.src = `${basePath}/thumbnails/queens/_default.jpg`;
+                        }}
                       />
                     ) : (
                       <div style={styles.avatarPlaceholder}>No image</div>
                     )}
                   </td>
-
                   <td style={styles.nameCol}>
                     <span
                       style={styles.nameLink}
                       onClick={() => router.push(`/queen/${q.slug}`)}
                     >
-                      {q.queen.toUpperCase()}
+                      {q.contestant_name.toUpperCase()}
                     </span>
                   </td>
-
                   <td style={styles.approvalCol}>
-                    <span style={styles.approvalBadge}>{q.pct}%</span>
+                    {q.approvalPct != null ? (
+                      <span style={styles.approvalBadge}>
+                        {q.approvalPct.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span style={styles.approvalLabel}>no votes yet</span>
+                    )}
                   </td>
-
                   <td style={styles.votesCol}>
                     <span style={styles.votesBadge}>
-                      {q.total} {q.total === 1 ? "vote" : "votes"}
+                      {q.totalVotes} {q.totalVotes === 1 ? "vote" : "votes"}
                     </span>
                   </td>
                 </tr>
@@ -93,148 +102,123 @@ export default function UserRankingsPage({ username, rows }) {
 export async function getServerSideProps(context) {
   const usernameParam = context.params?.username || "";
   const username = String(usernameParam).trim();
-
-  // If somehow empty, just show an empty state
   if (!username) {
-    return {
-      props: {
-        username: "",
-        rows: [],
-      },
-    };
+    return { props: { username: "", rows: [] } };
   }
 
-  const looksUrl = csvUrl(LOOKS_GID);
-  const votesUrl = csvUrl(VOTES_GID);
+  // Try to resolve username to user_id
+  let user_id = username;
+  // If username is not a UUID, look up user_id
+  if (!/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(username)) {
+    const { data: userRows } = await supabaseAdmin
+      .from('users')
+      .select('user_id, username')
+      .ilike('username', username);
+    if (userRows && userRows.length > 0) {
+      user_id = userRows[0].user_id;
+    }
+  }
 
-  const [looksRes, votesRes] = await Promise.all([
-    fetch(looksUrl),
-    fetch(votesUrl),
-  ]);
+  // Fetch all looks (use id as canonical look_uuid)
+  const { data: looks, error: looksError } = await supabaseAdmin
+    .from('looks')
+    .select('id, display_name, contestant_name, category, sequence, image_url');
+  if (looksError || !looks) {
+    return { props: { username, rows: [] } };
+  }
 
-  if (!looksRes.ok || !votesRes.ok) {
-  return {
-    props: {
-      username,
-      rows: [],
-      // you can add an error message prop if you want to display it
-    },
-  };
-}
+  // Fetch all votes for this user (by user_id)
+  const { data: votes, error: votesError } = await supabaseAdmin
+    .from('votes')
+    .select('look_uuid, user_id, vote, updated_at')
+    .eq('user_id', user_id);
+  if (votesError || !votes) {
+    return { props: { username, rows: [] } };
+  }
 
-  const looksText = await looksRes.text();
-  const votesText = await votesRes.text();
-
-  // --- parse LOOKS ---
-  const looksParsed = Papa.parse(looksText, {
-    header: true,
-    skipEmptyLines: true,
-  });
-
-  const looks = (looksParsed.data || [])
-    .filter((row) => row.look_id && row.queen && row.category)
-    .map((row) => ({
-      look_id: String(row.look_id).trim(),
-      queen: String(row.queen).trim(),
-      category: String(row.category).trim(),
-      image_url: (row.image_url || "").trim(),
-    }));
-
-  const lookById = {};
+  // Build lookByUuid and queenInfo
+  const lookByUuid = {};
   const queenInfo = {};
-
-  looks.forEach((look) => {
-    lookById[look.look_id] = look;
-    if (!queenInfo[look.queen]) {
-      queenInfo[look.queen] = {
-        queen: look.queen,
-        slug: slugify(look.queen),
+  for (const look of looks) {
+    const lookUuid = String(look.id || "").trim();
+    if (!lookUuid) continue;
+    lookByUuid[lookUuid] = look;
+    if (!queenInfo[look.contestant_name]) {
+      queenInfo[look.contestant_name] = {
+        contestant_name: look.contestant_name,
+        display_name: look.display_name,
+        slug: slugify(look.contestant_name),
         image_url: look.image_url,
       };
     }
-  });
+  }
 
-  // --- parse VOTES ---
-  const votesParsed = Papa.parse(votesText, {
-    header: true,
-    skipEmptyLines: true,
-  });
-  const allVotes = votesParsed.data || [];
-
-  // Filter votes for this username
-  const targetUser = username.toLowerCase();
-
- const userVotes = allVotes.filter((row) => {
-  const u = String(row.user || row.User || "").trim().toLowerCase();
-  return u === targetUser;
-});
-
-  // Latest vote per look_id
-  const latestByLook = {}; // look_id -> vote
-  userVotes.forEach((row) => {
-  const lookId = String(row.look_id || row.LOOK_ID || "").trim();
-  const vote = String(row.vote || row.Vote || "").toUpperCase().trim();
-
-  if (!lookId) return;
-  if (vote !== "TOOT" && vote !== "BOOT") return;
-
-  latestByLook[lookId] = vote; // later rows overwrite earlier ones
-});
-
-
-  // Aggregate to queen stats
-  const queenStats = {}; // queen -> { queen, slug, image_url, toots, boots, total, pct }
-
-  Object.entries(latestByLook).forEach(([lookId, vote]) => {
-    const look = lookById[lookId];
-    if (!look) return;
-
-    const qName = look.queen;
-    if (!queenStats[qName]) {
-      const info = queenInfo[qName] || {
-        queen: qName,
-        slug: slugify(qName),
-        image_url: "",
-      };
-      queenStats[qName] = {
-        queen: info.queen,
-        slug: info.slug,
-        image_url: info.image_url,
-        toots: 0,
-        boots: 0,
-        total: 0,
-        pct: 0,
-      };
+  // Only count the latest vote per (look_uuid, user_id)
+  const latestVoteByLookUser = {};
+  for (const v of votes) {
+    const lookUuid = String(v.look_uuid || '').trim();
+    const userId = String(v.user_id || '').trim();
+    const vote = String(v.vote || '').toUpperCase().trim();
+    if (!lookUuid || !userId) continue;
+    if (vote !== 'TOOT' && vote !== 'BOOT') continue;
+    const key = `${lookUuid}::${userId}`;
+    if (!latestVoteByLookUser[key] || new Date(v.updated_at) > new Date(latestVoteByLookUser[key].updated_at)) {
+      latestVoteByLookUser[key] = { lookUuid, userId, vote, updated_at: v.updated_at };
     }
+  }
 
-    const s = queenStats[qName];
-    if (vote === "TOOT") s.toots += 1;
-    if (vote === "BOOT") s.boots += 1;
-    s.total += 1;
+  // Aggregate votes by queen (contestant_name), but include all queens from looks
+  const queenStats = {};
+  // First, initialize all queens from looks with zeroed stats
+  Object.values(queenInfo).forEach((info) => {
+    queenStats[info.contestant_name] = {
+      contestant_name: info.contestant_name,
+      display_name: info.display_name,
+      slug: info.slug,
+      image_url: info.image_url,
+      toots: 0,
+      boots: 0,
+      totalVotes: 0,
+      approvalPct: null,
+    };
   });
+  // Then, add votes
+  for (const key in latestVoteByLookUser) {
+    const { lookUuid, vote } = latestVoteByLookUser[key];
+    const look = lookByUuid[lookUuid];
+    if (!look) continue;
+    const s = queenStats[look.contestant_name];
+    if (!s) continue;
+    if (vote === 'TOOT') s.toots += 1;
+    if (vote === 'BOOT') s.boots += 1;
+    s.totalVotes += 1;
+  }
 
-  const rows = Object.values(queenStats);
-  rows.forEach((s) => {
-    if (s.total > 0) {
-      s.pct = Math.round((s.toots / s.total) * 100);
-    } else {
-      s.pct = 0;
+  // Calculate approval % and total votes
+  const rows = Object.values(queenStats).map((s) => {
+    if (s.totalVotes > 0) {
+      return { ...s, approvalPct: (s.toots / s.totalVotes) * 100 };
     }
+    return { ...s, approvalPct: null };
   });
 
-  // Sort + dense rank
+  // Sort by approval %, then total votes, then name
   rows.sort((a, b) => {
-    if (b.pct !== a.pct) return b.pct - a.pct;
-    if (b.total !== a.total) return b.total - a.total;
-    return a.queen.localeCompare(b.queen);
+    if ((b.approvalPct ?? -1) !== (a.approvalPct ?? -1))
+      return (b.approvalPct ?? -1) - (a.approvalPct ?? -1);
+    if (b.totalVotes !== a.totalVotes) return b.totalVotes - a.totalVotes;
+    return (a.display_name || a.contestant_name || "").localeCompare(
+      b.display_name || b.contestant_name || ""
+    );
   });
 
   let lastPct = null;
   let currentRank = 0;
   rows.forEach((row, index) => {
-    if (lastPct === null || row.pct !== lastPct) {
+    const pctKey = row.approvalPct == null ? null : row.approvalPct.toFixed(6);
+    if (index === 0 || pctKey !== lastPct) {
       currentRank = index + 1;
-      lastPct = row.pct;
+      lastPct = pctKey;
     }
     row.rank = currentRank;
   });
@@ -246,8 +230,13 @@ export async function getServerSideProps(context) {
     },
   };
 }
-
 const styles = {
+  approvalLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    opacity: 0.9,
+  },
   page: {
     minHeight: "100vh",
     background: "#1a0f08",
@@ -255,7 +244,9 @@ const styles = {
     padding: "24px",
   },
   header: {
-    marginBottom: "16px",
+    marginBottom: "6px",
+    paddingTop: "12px",
+    textAlign: "center",
   },
   title: {
     fontSize: "26px",
@@ -263,11 +254,15 @@ const styles = {
     letterSpacing: "0.04em",
     textTransform: "uppercase",
     marginBottom: "6px",
+    textAlign: "center",
   },
   subtitle: {
     fontSize: "14px",
     opacity: 0.9,
     maxWidth: "640px",
+    margin: "0 auto 18px auto",
+    padding: 0,
+    textAlign: "center",
   },
   empty: {
     fontSize: "14px",
@@ -291,7 +286,7 @@ const styles = {
     borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
   },
   rankCol: {
-    width: "50px",
+    width: "40px",
     padding: "12px 16px",
     fontWeight: 700,
     textAlign: "center",
@@ -345,19 +340,31 @@ const styles = {
     display: "inline-block",
   },
   approvalBadge: {
-    display: "inline-block",
-    fontSize: "24px",
-    padding: "4px 10px",
-    borderRadius: "12px",
-    background: "rgba(255, 207, 122, 0.15)",
-    border: "1px solid rgba(255, 207, 122, 0.6)",
+     display: "inline-block",
+     fontSize: "20px",
+     padding: "4px 0px",
+     borderRadius: "12px",
+     background: "rgba(255, 207, 122, 0.15)",
+     border: "1px solid rgba(255, 207, 122, 0.6)",
+     width: "76px", // Ensures enough space for '100%'
+     textAlign: "center",
   },
   votesBadge: {
     display: "inline-block",
     padding: "4px 10px",
     borderRadius: "10px",
-    background: "rgba(117, 90, 54, 0.35)",
-    border: "1px solid rgba(255, 255, 255, 0.12)",
-    fontSize: "14px",
+    background: "rgba(255, 207, 122, 0.15)",
+    border: "1px solid rgba(255, 207, 122, 0.6)",
+    width: "48px",
+    fontSize: "12px",
+  },
+  thumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    objectFit: "cover",
+    background: "rgba(255, 207, 122, 0.15)",
+    border: "2px solid rgba(255, 207, 122, 0.6)",
+    flex: "0 0 auto",
   },
 };

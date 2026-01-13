@@ -1,62 +1,116 @@
 // components/NavBar.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 
 export default function NavBar() {
+  const queensBtnRef = useRef(null);
+  queensBtnRef.current = null;
+  const queensMenuRef = useRef(null);
+  queensMenuRef.current = null;
+  const categoriesBtnRef = useRef(null);
+  categoriesBtnRef.current = null;
+  const categoriesMenuRef = useRef(null);
+  categoriesMenuRef.current = null;
+  // Always initialize as empty arrays to avoid undefined
+  const [queens, setQueens] = useState(() => []);
+  const [categories, setCategories] = useState(() => []);
+  const [openMenu, setOpenMenu] = useState(null); // "queens" | "categories" | null
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-  const readUser = () => {
-    if (typeof window === "undefined") return;
-    const raw = window.localStorage.getItem("rr_user");
-    setUser(raw ? JSON.parse(raw) : null);
-  };
-
-  readUser();
-
-  // update when other tabs change auth
-  window.addEventListener("storage", readUser);
-
-  // update when this tab logs in/out
-  window.addEventListener("rr-auth-changed", readUser);
-
-  return () => {
-    window.removeEventListener("storage", readUser);
-    window.removeEventListener("rr-auth-changed", readUser);
-  };
-}, []);
-
-
-  const [queens, setQueens] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [openMenu, setOpenMenu] = useState(null); // "queens" | "categories" | null
+  // Only render dropdowns after queens/categories are loaded and valid
+  const queensReady = Array.isArray(queens) && queens.length > 0 && queens.every(q => typeof q === "string");
+  const categoriesReady = Array.isArray(categories) && categories.length > 0 && categories.every(c => typeof c === "string");
 
   useEffect(() => {
+    const readUser = () => {
+      if (typeof window === "undefined") return;
+      const raw = window.localStorage.getItem("rr_user");
+      setUser(raw ? JSON.parse(raw) : null);
+    };
+
+    readUser();
+
+    // update when other tabs change auth
+    window.addEventListener("storage", readUser);
+
+    // update when this tab logs in/out
+    window.addEventListener("rr-auth-changed", readUser);
+
+    return () => {
+      window.removeEventListener("storage", readUser);
+      window.removeEventListener("rr-auth-changed", readUser);
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const saved = window.localStorage.getItem("rr_user");
-    if (saved) {
-      setUser(JSON.parse(saved));
-    }
-
-    const raw = window.localStorage.getItem("rr_looks_cache");
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        const q = [...new Set(parsed.map((l) => l.queen))].sort();
-        const c = [...new Set(parsed.map((l) => l.category))].sort();
+    const fetchOptions = async () => {
+      // Fetch all contestant_name and categories from Supabase, including sequence
+      const { data: looks, error } = await require("../lib/supabaseClient").supabase
+        .from("looks")
+        .select("contestant_name, category, sequence");
+      // eslint-disable-next-line no-console
+      console.log("[NavBar] Raw looks data:", looks);
+      if (!error && looks) {
+        // Unique contestant_name only, sorted alphabetically
+        const qSet = new Set();
+        looks.forEach(l => {
+          if (l.contestant_name && typeof l.contestant_name === "string") {
+            qSet.add(l.contestant_name);
+          }
+        });
+        const q = Array.from(qSet).sort((a, b) => a.localeCompare(b));
+        // For categories, get unique category names with their minimum sequence
+        const catMap = {};
+        looks.forEach(l => {
+          if (!catMap[l.category] || l.sequence < catMap[l.category]) {
+            catMap[l.category] = l.sequence;
+          }
+        });
+        const c = Object.entries(catMap)
+          .sort((a, b) => (a[1] ?? 99999) - (b[1] ?? 99999))
+          .map(([cat]) => cat);
+        // eslint-disable-next-line no-console
+        console.log("[NavBar] queens (contestant_name):", q);
+        console.log("[NavBar] categories (by sequence):", c);
         setQueens(q);
         setCategories(c);
-      } catch {
-        // ignore bad JSON
       }
-    }
+    };
+    fetchOptions();
   }, []);
+
 
   function toggleMenu(name) {
     setOpenMenu((prev) => (prev === name ? null : name));
   }
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!openMenu) return;
+    function handleClick(e) {
+      if (openMenu === "queens") {
+        if (
+          queensBtnRef.current && queensBtnRef.current.contains(e.target)
+        ) return;
+        if (
+          queensMenuRef.current && queensMenuRef.current.contains(e.target)
+        ) return;
+      } else if (openMenu === "categories") {
+        if (
+          categoriesBtnRef.current && categoriesBtnRef.current.contains(e.target)
+        ) return;
+        if (
+          categoriesMenuRef.current && categoriesMenuRef.current.contains(e.target)
+        ) return;
+      }
+      closeMenu();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openMenu]);
 
   function closeMenu() {
     setOpenMenu(null);
@@ -65,97 +119,110 @@ export default function NavBar() {
   return (
     <header style={styles.header}>
       <div style={styles.topRow}>
-        <div style={styles.logo} />
+        <img
+          src="/rpdr-18/brand/s18-logo.png"
+          alt="Season 18 logo"
+          style={styles.logoImg}
+        />
         <h1 style={styles.title}>Season 18 Runway Review</h1>
       </div>
+
 
       <nav style={styles.nav}>
         {/* HOME */}
         <Link href="/" style={styles.navLink}>
-  HOME
-</Link>
+          HOME
+        </Link>
 
-        <Link href="/looks"style={styles.navLink}>ALL LOOKS</Link>
+        <Link href="/looks" style={styles.navLink}>ALL LOOKS</Link>
 
 
         {/* QUEENS DROPDOWN */}
-        <div style={styles.dropdownWrapper}>
-          <button
-            type="button"
-            style={styles.navButton}
-            onClick={() => toggleMenu("queens")}
-          >
-            QUEENS ▾
-          </button>
-          {openMenu === "queens" && (
-            <div style={styles.dropdownMenu}>
-              {queens.map((q) => (
-                <Link
-                  key={q}
-                  href={`/queen/${slugify(q)}`}
-                  style={styles.dropdownItem}
-                  onClick={closeMenu}
-                >
-                  {q}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        {queensReady && (
+          <div style={styles.dropdownWrapper}>
+            <button
+              type="button"
+              ref={queensBtnRef}
+              style={{ ...styles.navLink, ...styles.navButton, display: "flex", alignItems: "center", gap: 4 }}
+              onClick={() => toggleMenu("queens")}
+            >
+              <span>QUEENS</span>
+              <span style={{ fontSize: 14, marginLeft: 2 }}>▾</span>
+            </button>
+            {openMenu === "queens" && (
+              <div style={styles.dropdownMenu} ref={queensMenuRef}>
+                {queens.map((q) => (
+                  <Link
+                    key={q}
+                    href={`/queen/${slugify(q)}`}
+                    style={styles.dropdownItem}
+                    onClick={closeMenu}
+                  >
+                    {q}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* CATEGORIES DROPDOWN */}
-        <div style={styles.dropdownWrapper}>
-          <button
-            type="button"
-            style={styles.navButton}
-            onClick={() => toggleMenu("categories")}
-          >
-            CATEGORIES ▾
-          </button>
-          {openMenu === "categories" && (
-            <div style={styles.dropdownMenu}>
-              {categories.map((c) => (
-                <Link
-                  key={c}
-                  href={`/category/${slugify(c)}`}
-                  style={styles.dropdownItem}
-                  onClick={closeMenu}
-                >
-                  {c}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        {categoriesReady && (
+          <div style={styles.dropdownWrapper}>
+            <button
+              type="button"
+              ref={categoriesBtnRef}
+              style={{ ...styles.navLink, ...styles.navButton, display: "flex", alignItems: "center", gap: 4 }}
+              onClick={() => toggleMenu("categories")}
+            >
+              <span>CATEGORIES</span>
+              <span style={{ fontSize: 14, marginLeft: 2 }}>▾</span>
+            </button>
+            {openMenu === "categories" && (
+              <div style={styles.dropdownMenu} ref={categoriesMenuRef}>
+                {categories.map((c) => (
+                  <Link
+                    key={c}
+                    href={`/category/${slugify(c)}`}
+                    style={styles.dropdownItem}
+                    onClick={closeMenu}
+                  >
+                    {c}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* USER */}
-       {user ? (
-  <Link
-    href={`/user/${encodeURIComponent(user.username)}`}
-    style={styles.navLink}
-  >
-    {user.username}
-  </Link>
-) : (
-  <Link href="/login" style={styles.navLink}>
-    Log in
-  </Link>
-)}
+        {user ? (
+          <Link
+            href={`/user/${encodeURIComponent(user.username)}`}
+            style={styles.navLink}
+          >
+            {user.username}
+          </Link>
+        ) : (
+          <Link href="/login" style={styles.navLink}>
+            Log in
+          </Link>
+        )}
       </nav>
       <div style={styles.authBox}>
-  {user ? (
-    <>
-      <span style={styles.authText}>Logged in as: {user.username}</span>
-      <Link href="/logout" style={styles.authLink}>
-        (log out)
-      </Link>
-    </>
-  ) : (
-    <Link href="/login" style={styles.authLink}>
-      Log in with PIN
-    </Link>
-  )}
-</div>
+        {user ? (
+          <>
+            <span style={styles.authText}>Logged in as: {user.username}</span>
+            <Link href="/logout" style={styles.authLink}>
+              (log out)
+            </Link>
+          </>
+        ) : (
+          <Link href="/login" style={styles.authLink}>
+            Log in with PIN
+          </Link>
+        )}
+      </div>
 
     </header>
   );
@@ -175,31 +242,38 @@ const styles = {
     left: 0,
     right: 0,
     padding: "10px 24px 6px",
-    background: "#311202ff",
+    background: "rgb(54, 28, 4)",
     borderBottom: "1px solid rgba(255, 255, 255, 0.07)",
     zIndex: 1000,
   },
   topRow: {
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
-    gap: "12px",
+    justifyContent: "center",
+    gap: "8px",
     marginBottom: "6px",
   },
-  logo: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "6px",
-    background: "rgba(255, 255, 255, 0.1)",
+  logoImg: {
+    width: "240px",
+    height: "auto",
+    objectFit: "contain",
+    display: "block",
+    maxWidth: "100%",
   },
+
   title: {
     margin: 0,
     fontSize: "20px",
-    fontWeight: 700,
+    fontWeight: 600,
+    fontStyle: "italic",
+    color: "#facbb8",
   },
   nav: {
     display: "flex",
     gap: "24px",
     alignItems: "center",
+    justifyContent: "center",
   },
   disabledLink: {
     opacity: 0.5,
@@ -254,21 +328,22 @@ const styles = {
     whiteSpace: "nowrap",
   },
   authBox: {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  fontSize: "13px",
-  opacity: 0.95,
-  whiteSpace: "nowrap",
-},
-authText: {
-  opacity: 0.9,
-},
-authLink: {
-  color: "inherit",
-  textDecoration: "none",
-  cursor: "pointer",
-  fontWeight: 600,
-},
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px",
+    fontSize: "13px",
+    opacity: 0.95,
+    whiteSpace: "nowrap",
+  },
+  authText: {
+    opacity: 0.9,
+  },
+  authLink: {
+    color: "inherit",
+    textDecoration: "none",
+    cursor: "pointer",
+    fontWeight: 600,
+  },
 
 };

@@ -1,9 +1,9 @@
 // pages/queen/[queen].js
-import Papa from "papaparse";
-import { csvUrl, LOOKS_GID, VOTES_GID } from "../../config";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/router";
 import LookCard from "../../components/LookCard";
+import { supabase } from "../../lib/supabaseClient";
+import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
 
 function slugify(str) {
@@ -56,146 +56,241 @@ function enrichLooksWithApproval(looks, votesRaw) {
 }
 
 
-export default function QueenPage({ initialLooks, queenName }) {
-
+export default function QueenPage({ initialLooks, queenName: initialQueenName }) {
+  const router = useRouter();
+  const [queenName, setQueenName] = useState(initialQueenName);
   const [user, setUser] = useState(null);
   const [votes, setVotes] = useState({});
+  const [looks, setLooks] = useState(initialLooks);
+  const [loading, setLoading] = useState(true);
 
+  // On client load, read user from localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedUser = window.localStorage.getItem("rr_user");
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
-      setUser(parsed);
-
-      const key = `rr_votes_${parsed.username}`;
-      const savedVotes = window.localStorage.getItem(key);
-      if (savedVotes) {
-        try {
-          setVotes(JSON.parse(savedVotes));
-        } catch {
-          // ignore
-        }
-      }
+      setUser({ ...parsed, user_id: parsed.userId });
     }
   }, []);
 
+  // Fetch looks and votes from Supabase
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      "rr_looks_cache",
-      JSON.stringify(initialLooks)
-    );
-  }, [initialLooks]);
+    async function fetchData() {
+      if (!router.isReady) return;
+      setLoading(true);
+      // Fetch all looks for this queen
+      const { data: looksData, error: looksError } = await supabase
+        .from("looks")
+        .select("id, look_id, display_name, contestant_name, contestant_slug, category, sequence, image_url")
+        .eq("contestant_slug", (router.query.queen || "").toLowerCase())
+        .order("sequence", { ascending: true });
 
-
-  function handleVote(lookId, value) {
-    if (!user) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
+      if (looksError || !looksData) {
+        setLooks([]);
+        setQueenName("");
+        setLoading(false);
+        return;
       }
-      return;
+
+      // Use id as look_uuid for votes, but also keep look_id for legacy/compat
+      const lookIds = looksData.map(l => l.id);
+      const { data: allVotesData, error: votesError } = await supabase
+        .from("votes")
+        .select("look_uuid, vote")
+        .in("look_uuid", lookIds);
+
+      // Calculate approval % and vote count for each look
+      const lookStats = {};
+      (allVotesData || []).forEach((row) => {
+        if (!lookStats[row.look_uuid]) lookStats[row.look_uuid] = { toot: 0, total: 0 };
+        if (row.vote === "TOOT") lookStats[row.look_uuid].toot += 1;
+        lookStats[row.look_uuid].total += 1;
+      });
+
+      // Attach stats to looks
+      let looksWithStats = (looksData || []).map((look) => {
+        const stats = lookStats[look.id] || { toot: 0, total: 0 };
+        return {
+          ...look,
+          look_id: look.look_id || look.id, // ensure look_id is present for compatibility
+          overallApproval: stats.total > 0 ? Math.round((stats.toot / stats.total) * 100) : null,
+          overallVoteCount: stats.total,
+        };
+      });
+      // Sort by sequence ascending, then queen alphabetically for ties
+      looksWithStats.sort((a, b) => {
+        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
+      });
+      setLooks(looksWithStats);
+
+      // Update queenName from loaded data
+      if (looksData.length > 0) {
+        setQueenName(looksData[0].contestant_name || looksData[0].display_name || "");
+      } else {
+        setQueenName("");
+      }
+
+      // Fetch votes for this user
+      let userVotes = {};
+      if (user && user.user_id) {
+        const { data: userVotesData } = await supabase
+          .from("votes")
+          .select("look_uuid, vote")
+          .eq("user_id", user.user_id);
+        (userVotesData || []).forEach((row) => {
+          userVotes[row.look_uuid] = row.vote;
+        });
+      }
+      setVotes(userVotes);
+      setLoading(false);
     }
-    setVotes((prev) => {
-      const next = { ...prev, [lookId]: value };
-      if (typeof window !== "undefined") {
-        const key = `rr_votes_${user.username}`;
-        window.localStorage.setItem(key, JSON.stringify(next));
-      }
-      return next;
+    fetchData();
+  }, [user, router.isReady, router.query.queen]);
+
+  async function handleVote(lookUuid, value) {
+    if (!user) { window.location.href = "/login"; return; }
+
+    // Update local state
+    setVotes((prev) => ({ ...prev, [lookUuid]: value }));
+    // Persist to Supabase
+    await fetch(`${router.basePath}/api/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        look_uuid: lookUuid,
+        user_id: user.userId || user.user_id,
+        vote: value,
+      }),
     });
+
+    // Fetch latest approval and vote count for this look directly from Supabase for immediate update
+    try {
+      const { data: votes, error } = await supabase
+        .from("votes")
+        .select("vote")
+        .eq("look_uuid", lookUuid);
+      if (!error && votes) {
+        let toot = 0, total = 0;
+        votes.forEach((row) => {
+          if (row.vote === "TOOT") toot += 1;
+          total += 1;
+        });
+        const overallApproval = total > 0 ? Math.round((toot / total) * 100) : null;
+        setLooks((prevLooks) => prevLooks.map((look) =>
+          look.id === lookUuid
+            ? { ...look, overallApproval, overallVoteCount: total }
+            : look
+        ));
+      }
+    } catch (err) {
+      // ignore
+    }
   }
 
+  if (loading) return null;
+
   return (
-  <div style={styles.page}>
-    <div style={styles.content}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>{queenName}</h1>
-      </header>
-
-      <p style={styles.subtitle}>
-        All looks walked by <b>{queenName}</b> this season.
-      </p>
-
-      <div style={styles.cardGrid}>
-        {initialLooks.map((look) => (
-          <LookCard
-            key={look.look_id}
-            look={look}
-            userVote={votes[look.look_id]}
-            onVote={handleVote}
-            headerMode="queen"
-          />
-        ))}
+    <div style={styles.page}>
+      <div style={styles.content}>
+        <header style={styles.header}>
+          <h1 style={styles.title}>{queenName}</h1>
+        </header>
+        <p style={styles.subtitle}>
+          All looks walked by <b>{queenName}</b> this season.
+        </p>
+        <div style={styles.cardGrid}>
+          {looks.map((look) => (
+            <LookCard
+              key={look.id}
+              look={look}
+              userVote={votes[look.id]}
+              onVote={(ignoredLookId, voteValue) => handleVote(look.id, voteValue)}
+              headerMode="queen"
+              onCategoryClick={(categorySlug) => {
+                if (categorySlug) router.push(`/category/${categorySlug}`);
+              }}
+              disableQueenLink={true}
+            />
+          ))}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
 }
 
 export async function getServerSideProps(context) {
-  const { queen: queenSlug } = context.params;
+  // Get queen name from URL param
+  const { queen } = context.params;
+  // Un-slugify if needed (replace dashes with spaces, capitalize)
+  const queenSlug = String(queen || "").toLowerCase();
 
-  const looksUrl = csvUrl(LOOKS_GID);
-  const votesUrl = csvUrl(VOTES_GID);
+  const { data: looksRaw, error: looksError } = await supabaseAdmin
+    .from("looks")
+    .select("id, look_id, display_name, contestant_name, contestant_slug, category, sequence, image_url")
+    .eq("contestant_slug", queenSlug)
+    .order("sequence", { ascending: true });
 
-  const [looksRes, votesRes] = await Promise.all([
-    fetch(looksUrl),
-    fetch(votesUrl),
-  ]);
+  if (looksError || !looksRaw) {
+    console.error("Supabase error:", looksError);
+    return { props: { initialLooks: [], queenName } };
+  }
 
-  const looksText = await looksRes.text();
-  const votesText = await votesRes.text();
+  // Fetch all votes for these looks
+  const lookIds = looksRaw.map(l => l.look_id);
+  const { data: votesRaw, error: votesError } = await supabaseAdmin
+    .from("votes")
+    .select("look_id, vote, user_id, updated_at")
+    .in("look_id", lookIds);
 
-  // --- PARSE LOOKS (all) ---
-  const looksResult = Papa.parse(looksText, {
-    header: true,
-    skipEmptyLines: true,
+  // Aggregate votes per look row
+  const latestByUserLook = {};
+  (votesRaw || []).forEach((row) => {
+    const lookId = String(row.look_id || "").trim();
+    const userId = String(row.user_id || "").trim();
+    const vote = String(row.vote || "").toUpperCase().trim();
+    if (!lookId || !userId) return;
+    if (vote !== "TOOT" && vote !== "BOOT") return;
+    const key = `${lookId}::${userId}`;
+    if (!latestByUserLook[key] || new Date(row.updated_at) > new Date(latestByUserLook[key].updated_at)) {
+      latestByUserLook[key] = { lookId, vote, updated_at: row.updated_at };
+    }
   });
 
-  const allLooks = (looksResult.data || [])
-    .filter((row) => row.look_id && row.queen && row.category)
-    .map((row) => ({
-      look_id: row.look_id.trim(),
-      queen: row.queen.trim(),
-      category: row.category.trim(),
-      image_url: (row.image_url || "").trim(),
-    }));
-
-  // Filter to just this queen
-  const queenLooks = allLooks.filter(
-    (look) => slugify(look.queen) === queenSlug
-  );
-
-  // --- PARSE VOTES ---
-  const votesResult = Papa.parse(votesText, {
-    header: true,
-    skipEmptyLines: true,
+  // Calculate approval per look row
+  const grouped = {}; // lookId -> { toot, total }
+  Object.values(latestByUserLook).forEach(({ lookId, vote }) => {
+    if (!grouped[lookId]) grouped[lookId] = { toot: 0, total: 0 };
+    grouped[lookId].total += 1;
+    if (vote === "TOOT") grouped[lookId].toot += 1;
   });
 
-  const votes = (votesResult.data || []).filter(
-    (row) => row.look_id && row.user && row.vote
-  );
+  const looks = (looksRaw || []).map((look) => {
+    const g = grouped[look.look_id];
+    if (!g || g.total === 0) {
+      return { ...look, overallApproval: null, overallVoteCount: 0 };
+    }
+    const pct = Math.round((g.toot / g.total) * 100);
+    return { ...look, overallApproval: pct, overallVoteCount: g.total };
+  });
+  // Sort by sequence ascending, then display_name for ties
+  looks.sort((a, b) => {
+    if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+    return (a.display_name || a.contestant_name || "").localeCompare(b.display_name || b.contestant_name || "");
+  });
 
-  // Attach approval stats (using *all* votes, but only queen's looks)
-  const looksWithApproval = enrichLooksWithApproval(queenLooks, votes);
+  const queenNameFromData =
+    (looksRaw && looksRaw[0] && (looksRaw[0].contestant_name || looksRaw[0].display_name)) || "";
 
-  const queenName =
-    looksWithApproval[0]?.queen ||
-    queenSlug.replace(/-/g, " ").toUpperCase();
+  return { props: { initialLooks: looks, queenName: queenNameFromData } };
 
-  return {
-    props: {
-      initialLooks: looksWithApproval,
-      queenName,
-    },
-  };
 }
 
 
 const styles = {
- page: {
+  page: {
     minHeight: "100vh",
   },
 
@@ -204,32 +299,38 @@ const styles = {
   },
 
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: "12px",
+    margin: "0 0 6px 0",
+    padding: "12px 0 0 0",
+    textAlign: "center",
   },
   title: {
-    fontSize: "28px",
+    fontSize: "26px",
     fontWeight: 700,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    margin: "0 0 6px 0",
+    padding: 0,
+    textAlign: "center",
   },
   userBox: {
     fontSize: "14px",
     opacity: 0.9,
   },
-link: {
-  color: "#f4c27a",            // gold accent
-  textDecoration: "underline",
-  cursor: "pointer",
-},
+  link: {
+    color: "#f4c27a",            // gold accent
+    textDecoration: "underline",
+    cursor: "pointer",
+  },
 
   subtitle: {
     fontSize: "14px",
-    opacity: 0.85,
-    marginBottom: "16px",
-    maxWidth: "600px",
+    opacity: 0.9,
+    maxWidth: "640px",
+    margin: "0 auto 18px auto",
+    padding: "0 0 0 0",
+    textAlign: "center",
   },
-    cardGrid: {
+  cardGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: "16px",

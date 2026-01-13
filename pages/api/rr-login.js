@@ -1,7 +1,5 @@
 // pages/api/rr-login.js
-
-// TODO: paste your actual published CSV URL here:
-const USERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7gkI28VAaSH3ZQwKjaLjTnRGy6su8BvnTSYQCa1brfYzmYT1Rnnu749UvpCZb8j_O3j4UBDHxE7Ie/pub?gid=1969364061&single=true&output=csv";
+import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -11,7 +9,6 @@ export default async function handler(req, res) {
 
   try {
     const { username, pin } = req.body || {};
-
     if (!username || !pin) {
       res
         .status(400)
@@ -19,59 +16,28 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Fetch the Users sheet as CSV
-    const csvRes = await fetch(USERS_CSV_URL);
-    if (!csvRes.ok) {
-      res
-        .status(500)
-        .json({ success: false, error: "Unable to read users sheet." });
-      return;
-    }
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, pin_hash")
+      .eq("username", username.trim())
+      .maybeSingle();
 
-    const text = await csvRes.text();
-    const lines = text.trim().split(/\r?\n/);
-    if (lines.length < 2) {
-      res
-        .status(500)
-        .json({ success: false, error: "No users are configured yet." });
-      return;
-    }
+    if (error) {
+  console.error("Supabase login error:", error);
+  return res.status(500).json({
+    success: false,
+    error: "Error reading users table.",
+    debug: {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    },
+  });
+}
 
-    const cleanCell = (s) =>
-      String(s || "")
-        .replace(/^\uFEFF/, "")     // remove BOM if present
-        .replace(/^"|"$/g, "")      // strip surrounding quotes
-        .trim();
 
-    const header = lines[0].split(",").map((h) => cleanCell(h).toLowerCase());
-    const usernameCol = header.indexOf("username");
-    const pinCol = header.indexOf("pin");
-
-    if (usernameCol === -1 || pinCol === -1) {
-      res.status(500).json({
-        success: false,
-        error:
-          "Users sheet must have 'username' and 'pin' columns in the header row.",
-      });
-      return;
-    }
-
-    const trimmedUser = String(username).trim();
-    const trimmedPin = String(pin).trim();
-
-    let matchingRow = null;
-
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",").map(cleanCell);
-      const u = (cols[usernameCol] || "").trim();
-
-      if (u === trimmedUser) {
-        matchingRow = cols;
-        break;
-      }
-    }
-
-    if (!matchingRow) {
+    if (!data) {
       res.status(200).json({
         success: false,
         error: "Account not found. Please contact Andrew to be added.",
@@ -79,23 +45,30 @@ export default async function handler(req, res) {
       return;
     }
 
-    const storedPin = (matchingRow[pinCol] || "").trim();
-    if (storedPin !== trimmedPin) {
+    // For now: plain compare. Later you can use a proper hash check.
+    if (data.pin_hash !== pin.trim()) {
       res
         .status(200)
         .json({ success: false, error: "Incorrect PIN for this username." });
       return;
     }
 
-    // Success!
+    // Update last_login
+    await supabaseAdmin
+      .from("users")
+      .update({ last_login: new Date().toISOString() })
+      .eq("user_id", data.user_id);
+
     res.status(200).json({
       success: true,
-      username: trimmedUser,
+      username: data.username,
+      userId: data.user_id,
     });
   } catch (err) {
-    console.error("Error in /api/rr-login:", err);
+    console.error("Login server error:", err);
     res
       .status(500)
       .json({ success: false, error: "Server error while logging in." });
   }
 }
+

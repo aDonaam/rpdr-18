@@ -4,14 +4,13 @@ import { useRouter } from "next/router";
 
 export default function LoginPage() {
   const router = useRouter();
+  const basePath = router.basePath || "";
+
 
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
-
-  const SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbwuGx0sBkvJMjP7cAmpT3uagpsTb6BT0i7Yqw0dLA2iq86Oh2ubSVxghIHSuE8gnB8A2Q/exec";
 
   // If user already saved, pre-fill username
   useEffect(() => {
@@ -35,59 +34,66 @@ export default function LoginPage() {
     try {
       setInfo("Logging in...");
 
-      const res = await fetch(`${router.basePath}/api/rr-login`, {
+      const res = await fetch(`${basePath}/api/rr-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, pin }),
       });
 
-      // If the endpoint ever returns HTML (404 page), res.json() will explode.
-      // This keeps the error readable.
+      const ct = res.headers.get("content-type") || "";
       const text = await res.text();
+
+      if (!ct.includes("application/json")) {
+        throw new Error(`Login API returned non-JSON (${res.status}). Got: ${text.slice(0, 80)}...`);
+      }
+
       let data;
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error(`Login API did not return JSON. Got: ${text.slice(0, 80)}...`);
+        throw new Error(`Login API returned invalid JSON. Got: ${text.slice(0, 80)}...`);
       }
 
-      if (!data.success) {
-        setInfo("");
-        setError(data.error || "Login failed.");
-        return;
-      }
 
-      if (typeof window !== "undefined") {
-        // store current user + notify navbar
+      if (data.success) {
+        // 1) save login state
         window.localStorage.setItem(
           "rr_user",
-          JSON.stringify({ username: data.username })
+          JSON.stringify({ username: data.username, userId: data.userId })
         );
         window.dispatchEvent(new Event("rr-auth-changed"));
 
-        // rehydrate votes from Apps Script
-        try {
-          const url = `${SCRIPT_URL}?action=getUserVotes&user=${encodeURIComponent(
-            data.username
-          )}`;
-          const res2 = await fetch(url);
-          const text2 = await res2.text();
-          const data2 = JSON.parse(text2);
-
-          if (data2?.success && data2?.votes) {
-            window.localStorage.setItem(
-              `rr_votes_${data.username}`,
-              JSON.stringify(data2.votes)
+        // 2) fire-and-forget vote rehydration (DON'T await)
+        (async () => {
+          try {
+            const r = await fetch(
+              `${basePath}/api/user-votes?user_id=${encodeURIComponent(data.userId)}`
             );
-          }
-        } catch (err) {
-          console.error("Failed to fetch user votes", err);
-        }
 
-        // ✅ ONE redirect, straight to user page, respecting basePath (/rpdr-18)
-        window.location.replace(
-          `${router.basePath}/user/${encodeURIComponent(data.username)}`
-        );
+            const ct2 = r.headers.get("content-type") || "";
+            const t2 = await r.text();
+            if (!ct2.includes("application/json")) {
+              console.error("user-votes returned non-JSON:", r.status, t2.slice(0, 120));
+              return;
+            }
+
+            const j = JSON.parse(t2);
+            if (j?.success && j.votes) {
+              window.localStorage.setItem(`rr_votes_${data.username}`, JSON.stringify(j.votes));
+            }
+          } catch (e) {
+            console.error("vote rehydrate failed", e);
+          }
+        })();
+
+
+        // 3) redirect immediately (IMPORTANT: include basePath)
+        window.location.replace(`${basePath}/user/${encodeURIComponent(data.username)}`);
+        return;
+      } else {
+        setError(data.error || "Login failed. Please try again.");
+        setInfo("");
+        return;
       }
     } catch (err) {
       console.error("Login error", err);

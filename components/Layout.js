@@ -22,6 +22,6 @@ const styles = {
     overflowX: "hidden",    // belt-and-suspenders to kill horizontal scroll
   },
   main: {
-    padding: "110px 0 0 0", // only top padding for navbar clearance
+    padding: "180px 0 0 0", // increased top padding for navbar clearance
   },
 };

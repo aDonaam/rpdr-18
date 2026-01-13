@@ -1,7 +1,5 @@
-import Papa from "papaparse";
-import { csvUrl, LOOKS_GID, VOTES_GID } from "../config";
 import { useRouter } from "next/router";
-
+import { supabaseAdmin } from "../lib/supabaseAdmin";
 
 function slugify(str) {
   return (str || "")
@@ -10,297 +8,328 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
-// Build “latest vote per (look_id, user)” from raw Votes rows
-function buildLatestVotes(votesRaw) {
-  const latestByKey = {}; // key = `${lookId}::${user}`
-
-  (votesRaw || []).forEach((row) => {
-    const lookId = String(row.look_id || "").trim();
-    const user = String(row.user || "").trim();
-    const vote = String(row.vote || "").toUpperCase().trim();
-
-    if (!lookId || !user) return;
-    if (vote !== "TOOT" && vote !== "BOOT") return;
-
-    const key = `${lookId}::${user}`;
-    // Because rows are appended, later rows overwrite earlier ones
-    latestByKey[key] = { lookId, user, vote };
-  });
-
-  return Object.values(latestByKey);
+function queenThumbSrc(contestant_name, basePath = "") {
+  return `${basePath}/thumbnails/queens/${slugify(contestant_name)}.png`;
 }
 
-// Aggregate approval per queen
-function buildQueenStats(looks, latestVotes) {
-  // Map look_id -> look (to know which queen each vote belongs to)
-  const lookById = {};
-  looks.forEach((look) => {
-    lookById[look.look_id] = look;
-  });
-
-  const queenStats = {}; // queenName -> stats object
-
-  latestVotes.forEach(({ lookId, vote }) => {
-    const look = lookById[lookId];
-    if (!look) return;
-
-    const qName = look.queen;
-    if (!queenStats[qName]) {
-      queenStats[qName] = {
-        queen: qName,
-        slug: slugify(qName),
-        // Use the first look's image as thumbnail for now
-        image_url: look.image_url || "",
-        toot: 0,
-        total: 0,
-      };
-    }
-
-    const stats = queenStats[qName];
-    stats.total += 1;
-    if (vote === "TOOT") stats.toot += 1;
-  });
-
-  // Convert to list + compute pct + totalVotes
-  const queenRows = Object.values(queenStats).map((q) => {
-    const pct =
-      q.total > 0 ? Math.round((q.toot / q.total) * 100) : null;
-
-    return {
-      queen: q.queen,
-      slug: q.slug,
-      image_url: q.image_url,
-      approvalPct: pct,
-      totalVotes: q.total,
-    };
-  });
-
-  // Sort by approval % desc, then totalVotes desc, then name asc
-  queenRows.sort((a, b) => {
-    const pa = a.approvalPct ?? -1;
-    const pb = b.approvalPct ?? -1;
-    if (pb !== pa) return pb - pa;
-
-    if (b.totalVotes !== a.totalVotes) {
-      return b.totalVotes - a.totalVotes;
-    }
-
-    return a.queen.localeCompare(b.queen);
-  });
-
-  // Dense ranking: 1,2,2,3,...
-  let currentRank = 0;
-  let lastPct = null;
-
-  queenRows.forEach((row, idx) => {
-    if (row.approvalPct !== lastPct) {
-      currentRank = idx + 1;
-      lastPct = row.approvalPct;
-    }
-    row.rank = currentRank;
-  });
-
-  return queenRows;
-}
-
-export default function Home({ queens }) {
+export default function Home({ initialLooks }) {
   const router = useRouter();
+  const basePath = router.basePath || "";
   return (
     <div style={styles.page}>
       <header style={styles.header}>
         <h1 style={styles.title}>
-          Season 18 Queens Public Approval Leaderboard
+          Public Leaderboard
         </h1>
       </header>
-
       <p style={styles.subtitle}>
-        Rankings are based on all toot/boot votes across every look,
-        using only each user&apos;s most recent vote per look.
+        Queens are ranked by all votes across all looks.
       </p>
-
-      <div style={styles.list}>
-        {queens.map((q) => (
-          <div key={q.slug} style={styles.row}>
-            {/* Rank */}
-            <div style={styles.rankBox}>
-              <span style={styles.rankText}>#{q.rank}</span>
-            </div>
-
-            {/* Thumbnail */}
-            <div style={styles.thumbBox}>
-              {q.image_url ? (
-                <img
-                  src={q.image_url}
-                  alt={q.queen}
-                  style={styles.thumbImage}
-                />
-              ) : (
-                <div style={styles.thumbPlaceholder}>No image</div>
-              )}
-            </div>
-
-            {/* Name (links to queen page) */}
-            <div style={styles.nameBox}>
-                <span
-    style={styles.nameLink}
-    onClick={() => router.push(`/queen/${q.slug}`)}
-  >
-    {q.queen.toUpperCase()}
-  </span>
-            </div>
-
-            {/* Public approval + total votes */}
-            <div style={styles.statsBox}>
-              {q.approvalPct != null ? (
-                <>
-                  <div style={styles.approvalPct}>
-                    {q.approvalPct}%
-                  </div>
-                </>
-              ) : (
-                <div style={styles.approvalLabel}>no votes yet</div>
-              )}
-
-              <div style={styles.totalVotes}>
-                {q.totalVotes}{" "}
-                {q.totalVotes === 1 ? "vote" : "votes"}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {initialLooks.length === 0 && (
+        <p style={styles.empty}>
+          No votes have been cast yet.
+        </p>
+      )}
+      {initialLooks.length > 0 && (
+        <div style={styles.tableWrapper}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.rankCol}>Rank</th>
+                <th style={styles.imageCol}></th>
+                <th style={styles.nameCol}>Queen</th>
+                <th style={styles.approvalCol}>Approval</th>
+                <th style={styles.votesCol}>Votes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {initialLooks.map((q) => (
+                <tr key={q.slug} style={styles.row}>
+                  <td style={styles.rankCol}>{q.rank}</td>
+                  <td style={styles.imageCol}>
+                    {q.image_url ? (
+                      <img
+                        src={queenThumbSrc(q.contestant_name, basePath)}
+                        alt={`${q.display_name || q.contestant_name} thumbnail`}
+                        style={styles.thumb}
+                        onError={(e) => {
+                          e.currentTarget.src = `${basePath}/thumbnails/queens/_default.jpg`;
+                        }}
+                      />
+                    ) : (
+                      <div style={styles.avatarPlaceholder}>No image</div>
+                    )}
+                  </td>
+                  <td style={styles.nameCol}>
+                    <span
+                      style={styles.nameLink}
+                      onClick={() => router.push(`/queen/${q.slug}`)}
+                    >
+                      {q.contestant_name.toUpperCase()}
+                    </span>
+                  </td>
+                  <td style={styles.approvalCol}>
+                    {q.approvalPct != null ? (
+                      <span style={styles.approvalBadge}>
+                        {q.approvalPct.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span style={styles.approvalLabel}>no votes yet</span>
+                    )}
+                  </td>
+                  <td style={styles.votesCol}>
+                    <span style={styles.votesBadge}>
+                      {q.totalVotes} {q.totalVotes === 1 ? "vote" : "votes"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
 
-// Server-side: fetch Looks + Votes and compute queen rows
 export async function getServerSideProps() {
-  const looksUrl = csvUrl(LOOKS_GID);
-  const votesUrl = csvUrl(VOTES_GID);
+  // 1) Fetch looks (use id — the uuid primary key)
+  const { data: looks, error: looksError } = await supabaseAdmin
+    .from("looks")
+    .select("id, display_name, contestant_name, category, sequence, image_url");
 
-  const [looksRes, votesRes] = await Promise.all([
-    fetch(looksUrl),
-    fetch(votesUrl),
-  ]);
+  if (looksError || !looks) {
+    console.error("looksError:", looksError);
+    return { props: { initialLooks: [] } };
+  }
 
-  const looksText = await looksRes.text();
-  const votesText = await votesRes.text();
+  // 2) Fetch votes (look_uuid is FK -> looks.id)
+  const { data: votes, error: votesError } = await supabaseAdmin
+    .from("votes")
+    .select("look_uuid, user_id, vote, updated_at");
 
-  const looksResult = Papa.parse(looksText, {
-    header: true,
-    skipEmptyLines: true,
+  if (votesError || !votes) {
+    console.error("votesError:", votesError);
+    return { props: { initialLooks: [] } };
+  }
+
+  // 3) Map looks by their uuid id
+  const lookByUuid = {};
+  const queenInfo = {};
+
+  for (const look of looks) {
+    const lookUuid = String(look.id || "").trim(); // ✅ KEY CHANGE
+    if (!lookUuid) continue;
+
+    lookByUuid[lookUuid] = look;
+
+    if (!queenInfo[look.contestant_name]) {
+      queenInfo[look.contestant_name] = {
+        contestant_name: look.contestant_name,
+        display_name: look.display_name,
+        slug: slugify(look.contestant_name),
+        image_url: look.image_url,
+      };
+    }
+  }
+
+  // 4) Latest vote per (look_uuid, user_id)
+  const latestVoteByLookUser = {};
+  for (const v of votes) {
+    const lookUuid = String(v.look_uuid || "").trim(); // this is looks.id
+    const userId = String(v.user_id || "").trim();
+    const vote = String(v.vote || "").toUpperCase().trim();
+    if (!lookUuid || !userId) continue;
+    if (vote !== "TOOT" && vote !== "BOOT") continue;
+
+    const key = `${lookUuid}::${userId}`;
+    const prev = latestVoteByLookUser[key];
+
+    if (!prev || new Date(v.updated_at) > new Date(prev.updated_at)) {
+      latestVoteByLookUser[key] = { lookUuid, vote, updated_at: v.updated_at };
+    }
+  }
+
+  // 5) Initialize queen stats
+  const queenStats = {};
+  Object.values(queenInfo).forEach((info) => {
+    queenStats[info.contestant_name] = {
+      ...info,
+      toots: 0,
+      boots: 0,
+      totalVotes: 0,
+      approvalPct: null,
+    };
   });
 
-  const votesResult = Papa.parse(votesText, {
-    header: true,
-    skipEmptyLines: true,
+  // 6) Aggregate votes -> queen using lookByUuid[lookUuid]
+  for (const key in latestVoteByLookUser) {
+    const { lookUuid, vote } = latestVoteByLookUser[key];
+    const look = lookByUuid[lookUuid]; // ✅ now this resolves
+    if (!look) continue;
+
+    const s = queenStats[look.contestant_name];
+    if (!s) continue;
+
+    if (vote === "TOOT") s.toots += 1;
+    if (vote === "BOOT") s.boots += 1;
+    s.totalVotes += 1;
+  }
+
+  // 7) Compute approval
+  const rows = Object.values(queenStats).map((s) => {
+    if (s.totalVotes > 0) {
+      return { ...s, approvalPct: (s.toots / s.totalVotes) * 100 };
+    }
+    return { ...s, approvalPct: null };
   });
 
-  const looks = (looksResult.data || [])
-    .filter((row) => row.look_id && row.queen && row.category)
-    .map((row) => ({
-      look_id: String(row.look_id).trim(),
-      queen: String(row.queen).trim(),
-      category: String(row.category).trim(),
-      image_url: (row.image_url || "").trim(),
-    }));
+  // 8) Sort + dense rank
+  rows.sort((a, b) => {
+    if ((b.approvalPct ?? -1) !== (a.approvalPct ?? -1))
+      return (b.approvalPct ?? -1) - (a.approvalPct ?? -1);
+    if (b.totalVotes !== a.totalVotes) return b.totalVotes - a.totalVotes;
+    return (a.display_name || a.contestant_name || "").localeCompare(
+      b.display_name || b.contestant_name || ""
+    );
+  });
 
-  const votes = (votesResult.data || []).filter(
-    (row) => row.look_id && row.user && row.vote
-  );
+  let lastPct = null;
+  let currentRank = 0;
+  rows.forEach((row, index) => {
+    const pctKey = row.approvalPct == null ? null : row.approvalPct.toFixed(6);
+    if (index === 0 || pctKey !== lastPct) {
+      currentRank = index + 1;
+      lastPct = pctKey;
+    }
+    row.rank = currentRank;
+  });
 
-  const latestVotes = buildLatestVotes(votes);
-  const queens = buildQueenStats(looks, latestVotes);
-
-  return {
-    props: { queens },
-  };
+  return { props: { initialLooks: rows } };
 }
+
 
 const styles = {
   page: {
-    // Layout padding/background comes from Layout.js
+    minHeight: "100vh",
+    background: "#1a0f08",
+    color: "#fdf4e3",
+    padding: "24px",
   },
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: "8px",
+    marginBottom: "6px",
+    paddingTop: "12px",
+    textAlign: "center",
   },
   title: {
     fontSize: "26px",
     fontWeight: 700,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    marginBottom: "6px",
+    textAlign: "center",
   },
   subtitle: {
     fontSize: "14px",
-    opacity: 0.85,
-    marginBottom: "18px",
-    maxWidth: "620px",
+    opacity: 0.9,
+    maxWidth: "640px",
+    margin: "0 auto 18px auto",
+    padding: 0,
+    textAlign: "center",
   },
-  list: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
+  empty: {
+    fontSize: "14px",
+    opacity: 0.9,
+    marginTop: "16px",
+  },
+  tableWrapper: {
+    marginTop: "16px",
+    borderRadius: "10px",
+    overflow: "hidden",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    background:
+      "radial-gradient(circle at top, rgba(255,255,255,0.05), transparent 55%), #140a06",
+    margin: "16px auto",
+    width: "fit-content",
+  },
+  table: {
+    borderCollapse: "collapse",
   },
   row: {
-    display: "grid",
-    gridTemplateColumns: "70px 80px 1fr 160px",
-    alignItems: "center",
-    gap: "12px",
-    padding: "10px 14px",
-    borderRadius: "16px",
-    background: "rgba(0, 0, 0, 0.25)", // tweak to match your card color
-    border: "1px solid rgba(255, 255, 255, 0.07)",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
   },
-  rankBox: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rankText: {
-    fontSize: "24px",
+  rankCol: {
+    width: "40px",
+    padding: "12px 16px",
     fontWeight: 700,
-  },
-  thumbBox: {
-    width: "70px",
-    height: "70px",
-    borderRadius: "12px",
-    overflow: "hidden",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-    background: "rgba(0,0,0,0.3)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  thumbImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  },
-  thumbPlaceholder: {
-    fontSize: "10px",
-    opacity: 0.7,
     textAlign: "center",
-    padding: "4px",
   },
-  nameBox: {
-    padding: "0 4px",
+  imageCol: {
+    width: "80px",
+    padding: "8px 8px",
+    textAlign: "center",
+  },
+  nameCol: {
+    padding: "12px 16px",
+    textAlign: "center",
+    width: "300px",
+  },
+  approvalCol: {
+    width: "120px",
+    padding: "12px 0px",
+    textAlign: "center",
+  },
+  votesCol: {
+    width: "100px",
+    padding: "12px 0px",
+    textAlign: "center",
+  },
+  avatar: {
+    width: "56px",
+    height: "56px",
+    borderRadius: "12px",
+    objectFit: "cover",
+    border: "1px solid rgba(255, 255, 255, 0.25)",
+  },
+  avatarPlaceholder: {
+    width: "56px",
+    height: "56px",
+    borderRadius: "12px",
+    border: "1px dashed rgba(255, 255, 255, 0.25)",
+    fontSize: "10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.7,
   },
   nameLink: {
     fontSize: "24px",
     fontWeight: 700,
     letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: "#fdf4e3",
+    cursor: "pointer",
+    textDecoration: "none",
+    display: "inline-block",
   },
-  statsBox: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: "2px",
-  },
-  approvalPct: {
+  approvalBadge: {
+    display: "inline-block",
     fontSize: "20px",
-    fontWeight: 700,
+    padding: "4px 0px",
+    borderRadius: "12px",
+    background: "rgba(255, 207, 122, 0.15)",
+    border: "1px solid rgba(255, 207, 122, 0.6)",
+    width: "76px", // Ensures enough space for '100%'
+    textAlign: "center",
+  },
+  votesBadge: {
+    display: "inline-block",
+    padding: "4px 10px",
+    borderRadius: "10px",
+    background: "rgba(255, 207, 122, 0.15)",
+    border: "1px solid rgba(255, 207, 122, 0.6)",
+    fontSize: "12px",
+    width: "48px"
   },
   approvalLabel: {
     fontSize: "11px",
@@ -308,9 +337,14 @@ const styles = {
     letterSpacing: "0.08em",
     opacity: 0.9,
   },
-  totalVotes: {
-    marginTop: "4px",
-    fontSize: "11px",
-    opacity: 0.85,
+  thumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    objectFit: "cover",
+    background: "rgba(255, 207, 122, 0.15)",
+    border: "2px solid rgba(255, 207, 122, 0.6)",
+    flex: "0 0 auto",
   },
+
 };

@@ -1,0 +1,18 @@
+{
+  "looks": [
+    { "id": "L1",  "title": "Look 1",  "image_url": null, "episode": null },
+    { "id": "L2",  "title": "Look 2",  "image_url": null, "episode": null },
+    { "id": "L3",  "title": "Look 3",  "image_url": null, "episode": null },
+    { "id": "L4",  "title": "Look 4",  "image_url": null, "episode": null },
+    { "id": "L5",  "title": "Look 5",  "image_url": null, "episode": null },
+    { "id": "L6",  "title": "Look 6",  "image_url": null, "episode": null },
+    { "id": "L7",  "title": "Look 7",  "image_url": null, "episode": null },
+    { "id": "L8",  "title": "Look 8",  "image_url": null, "episode": null },
+    { "id": "L9",  "title": "Look 9",  "image_url": null, "episode": null },
+    { "id": "L10", "title": "Look 10", "image_url": null, "episode": null },
+    { "id": "L11", "title": "Look 11", "image_url": null, "episode": null },
+    { "id": "L12", "title": "Look 12", "image_url": null, "episode": null },
+    { "id": "L13", "title": "Look 13", "image_url": null, "episode": null },
+    { "id": "L14", "title": "Look 14", "image_url": null, "episode": null }
+  ]
+}

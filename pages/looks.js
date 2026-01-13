@@ -1,71 +1,14 @@
-import Papa from "papaparse";
-import { csvUrl, LOOKS_GID, VOTES_GID } from "../config";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/router";
 import LookCard from "../components/LookCard";
+import { supabase } from "../lib/supabaseClient";
 
-
-function slugify(str) {
-  return (str || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function enrichLooksWithApproval(looks, votesRaw) {
-  // votesRaw should be the parsed rows from the Votes sheet
-  const latestByUserLook = {}; // key: `${lookId}::${user}` -> { lookId, vote }
-
-  (votesRaw || []).forEach((row) => {
-    const lookId = (row.look_id || "").trim();
-    const user = (row.user || "").trim();
-    const vote = (row.vote || "").toUpperCase().trim();
-
-    if (!lookId || !user) return;
-    if (vote !== "TOOT" && vote !== "BOOT") return;
-
-    const key = `${lookId}::${user}`;
-    // Because the CSV preserves sheet order, and new votes are appended
-    // at the bottom, simply overwriting here means:
-    // "the last row for this (look, user) is the latest vote".
-    latestByUserLook[key] = { lookId, vote };
-  });
-
-  // Aggregate per look_id
-  const grouped = {}; // lookId -> { toot, total }
-  Object.values(latestByUserLook).forEach(({ lookId, vote }) => {
-    if (!grouped[lookId]) {
-      grouped[lookId] = { toot: 0, total: 0 };
-    }
-    grouped[lookId].total += 1;
-    if (vote === "TOOT") grouped[lookId].toot += 1;
-  });
-
-  // Attach approval stats onto each look
-  return (looks || []).map((look) => {
-    const g = grouped[look.look_id];
-    if (!g || g.total === 0) {
-      return {
-        ...look,
-        overallApproval: null,
-        overallVoteCount: 0,
-      };
-    }
-    const pct = Math.round((g.toot / g.total) * 100);
-    return {
-      ...look,
-      overallApproval: pct,
-      overallVoteCount: g.total,
-    };
-  });
-}
-
-
-
-export default function LooksPage({ initialLooks }) {
+export default function LooksPage() {
+    const router = useRouter();
   const [user, setUser] = useState(null);
   const [votes, setVotes] = useState({}); // { [look_id]: "TOOT" | "BOOT" }
-  const [looks, setLooks] = useState(initialLooks || []);
+  const [looks, setLooks] = useState([]); // [{...look, overallApproval, overallVoteCount}]
+  const [loading, setLoading] = useState(true);
 
   // On client load, read user from localStorage
   useEffect(() => {
@@ -73,134 +16,144 @@ export default function LooksPage({ initialLooks }) {
     const savedUser = window.localStorage.getItem("rr_user");
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
-      setUser(parsed);
-
-      // also load that user's saved votes
-      const key = `rr_votes_${parsed.username}`;
-      const savedVotes = window.localStorage.getItem(key);
-      if (savedVotes) {
-        try {
-          setVotes(JSON.parse(savedVotes));
-        } catch {
-          // ignore bad JSON
-        }
-      }
+      // Map userId to user_id for consistency
+      setUser({ ...parsed, user_id: parsed.userId });
     }
   }, []);
 
-  // Save Looks so NavBar can populate Queen + Category dropdowns
+  // Fetch looks and votes from Supabase
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      "rr_looks_cache",
-      JSON.stringify(initialLooks)
-    );
-  }, [initialLooks]);
+    async function fetchData() {
+      setLoading(true);
+      // Fetch all looks, including sequence
+      const { data: looksData, error: looksError } = await supabase
+        .from("looks")
+        .select("id, display_name, contestant_name, category, sequence, image_url")
+        .order("sequence", { ascending: true });
 
-
-  function handleVote(lookId, value) {
-    // Only allow voting when logged in
-    if (!user) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
+      if (looksError || !looksData) {
+        setLooks([]);
+        setLoading(false);
+        return;
       }
-      return;
+
+      // Fetch all votes for all looks
+      // Use id as look_uuid for votes, but also keep look_id for legacy/compat
+      const lookIds = looksData.map(l => l.id);
+      const { data: allVotesData, error: votesError } = await supabase
+        .from("votes")
+        .select("look_uuid, vote")
+        .in("look_uuid", lookIds);
+
+      // Calculate approval % and vote count for each look
+      const lookStats = {};
+      (allVotesData || []).forEach((row) => {
+        if (!lookStats[row.look_uuid]) lookStats[row.look_uuid] = { toot: 0, total: 0 };
+        if (row.vote === "TOOT") lookStats[row.look_uuid].toot += 1;
+        lookStats[row.look_uuid].total += 1;
+      });
+
+      // Attach stats to looks
+      let looksWithStats = (looksData || []).map((look) => {
+        const stats = lookStats[look.id] || { toot: 0, total: 0 };
+        return {
+          ...look,
+          look_id: look.look_id || look.id, // ensure look_id is present for compatibility
+          overallApproval: stats.total > 0 ? Math.round((stats.toot / stats.total) * 100) : null,
+          overallVoteCount: stats.total,
+        };
+      });
+      // Sort by sequence ascending, then queen alphabetically for ties
+      looksWithStats.sort((a, b) => {
+        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
+      });
+      setLooks(looksWithStats);
+
+      // Fetch votes for this user
+      let userVotes = {};
+      if (user && user.user_id) {
+        const { data: userVotesData } = await supabase
+          .from("votes")
+          .select("look_uuid, vote")
+          .eq("user_id", user.user_id);
+        (userVotesData || []).forEach((row) => {
+          userVotes[row.look_uuid] = row.vote;
+        });
+      }
+      setVotes(userVotes);
+      setLoading(false);
     }
+    fetchData();
+  }, [user]);
 
-    setVotes((prev) => {
-      const next = { ...prev, [lookId]: value };
-      if (typeof window !== "undefined") {
-        const key = `rr_votes_${user.username}`;
-        window.localStorage.setItem(key, JSON.stringify(next));
-      }
-      return next;
+  async function handleVote(lookUuid, value) {
+    if (!user) { window.location.href = "/login"; return; }
+
+    // Update local state
+    setVotes((prev) => ({ ...prev, [lookUuid]: value }));
+    // Persist to Supabase
+    await fetch(`${router.basePath}/api/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        look_uuid: lookUuid,
+        user_id: user.userId || user.user_id,
+        vote: value,
+      }),
     });
+
+    // Fetch latest approval and vote count for this look directly from Supabase for immediate update
+    try {
+      const { data: votes, error } = await supabase
+        .from("votes")
+        .select("vote")
+        .eq("look_uuid", lookUuid);
+      if (!error && votes) {
+        let toot = 0, total = 0;
+        votes.forEach((row) => {
+          if (row.vote === "TOOT") toot += 1;
+          total += 1;
+        });
+        const overallApproval = total > 0 ? Math.round((toot / total) * 100) : null;
+        setLooks((prevLooks) => prevLooks.map((look) =>
+          look.id === lookUuid
+            ? { ...look, overallApproval, overallVoteCount: total }
+            : look
+        ));
+      }
+    } catch (err) {
+      // ignore
+    }
   }
 
-return (
-  <div style={styles.page}>
-    <div style={styles.content}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>Season 18 Runway Review</h1>   
-      </header>
 
-      <p style={styles.subtitle}>Subtitle here if wanted
-      </p>
+  if (loading) return null;
 
-      <div style={styles.cardGrid}>
-        {looks.map((look) => (
-          <LookCard
-            key={look.look_id}
-            look={look}
-            userVote={votes[look.look_id]}
-            onVote={handleVote}
-            headerMode="home"
-          />
-        ))}
+  return (
+    <div style={styles.page}>
+      <div style={styles.content}>
+        <header style={styles.header}>
+          <h1 style={styles.title}>All runway looks from Season 18</h1>
+        </header>
+        <p style={styles.subtitle}>All runway looks from Season 18</p>
+        <div style={styles.cardGrid}>
+          {looks.map((look) => (
+            <LookCard
+              key={look.id}
+              look={look}
+              userVote={votes[look.id]}
+              onVote={(ignoredLookId, voteValue) => handleVote(look.id, voteValue)}
+            />
+          ))}
+        </div>
       </div>
     </div>
-  </div>
-);
-
+  );
 }
 
-// Server-side fetch of CSV
-export async function getServerSideProps() {
-  const { data, error } = await supabase
-    .from("looks")
-    .select("look_id, queen, category, image_url, avg_toot_pct, total_votes")
-    .order("queen", { ascending: true });
-
-  if (error) {
-    console.error("Supabase error:", error);
-    return { props: { initialLooks: [] } };
-  }
-
-  const looks = (data || []).map((row) => ({
-    look_id: row.look_id,
-    queen: row.queen,
-    category: row.category,
-    image_url: row.image_url,
-    overallApproval: row.avg_toot_pct ?? null,
-    overallVoteCount: row.total_votes ?? 0,
-
-
-
-
-
-
-
-
-
-
-  }));
-
-  return { props: { initialLooks: looks } };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}
-
-// Inline styles for now (we'll convert to Tailwind later)
 const styles = {
- page: {
+  page: {
     minHeight: "100vh",
   },
 
@@ -209,32 +162,38 @@ const styles = {
   },
 
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    marginBottom: "12px",
+    margin: "0 0 6px 0",
+    padding: "12px 0 0 0",
+    textAlign: "center",
   },
   title: {
-    fontSize: "28px",
+    fontSize: "26px",
     fontWeight: 700,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    margin: "0 0 6px 0",
+    padding: 0,
+    textAlign: "center",
   },
   userBox: {
     fontSize: "14px",
     opacity: 0.9,
   },
-link: {
-  color: "#f4c27a",            // gold accent
-  textDecoration: "underline",
-  cursor: "pointer",
-},
+  link: {
+    color: "#f4c27a",            // gold accent
+    textDecoration: "underline",
+    cursor: "pointer",
+  },
 
   subtitle: {
     fontSize: "14px",
-    opacity: 0.85,
-    marginBottom: "16px",
-    maxWidth: "600px",
+    opacity: 0.9,
+    maxWidth: "640px",
+    margin: "0 auto 18px auto",
+    padding: "0 0 0 0",
+    textAlign: "center",
   },
-    cardGrid: {
+  cardGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: "16px",
