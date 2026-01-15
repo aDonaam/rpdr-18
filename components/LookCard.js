@@ -346,18 +346,24 @@ const styles = {
   },
 
   comingSoonBox: {
-    width: "100%",
-    aspectRatio: "764 / 1079",   
+    marginTop: "6px",
+    borderRadius: "12px",
+    overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     textAlign: "center",
+    width: "100%",
+    maxWidth: "275px",
+    aspectRatio: "764 / 1079",
+    marginLeft: "auto",
+    marginRight: "auto",
+    background: "#1a0f08",
+    border: "1px solid rgba(255, 204, 128, 0.35)",
     fontWeight: 600,
     letterSpacing: "0.12em",
     textTransform: "uppercase",
     color: "rgba(253, 244, 227, 0.9)",
-    background: "rgba(255, 207, 122, 0.08)",
-    border: "1px solid rgba(255, 207, 122, 0.35)",
   }
 
 };

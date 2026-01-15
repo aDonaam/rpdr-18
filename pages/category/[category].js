@@ -62,6 +62,21 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName }) {
   const [votes, setVotes] = useState({});
   const [looks, setLooks] = useState(initialLooks);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 600);
+    }
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  function mergeStyles(base, mobile) {
+    if (!isMobile) return base;
+    return { ...base, ...mobile };
+  }
 
   // On client load, read user from localStorage
   useEffect(() => {
@@ -191,12 +206,15 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName }) {
     }
   }
 
+  const mobileContentStyle = { paddingTop: "0px", paddingLeft: "10px", paddingRight: "10px", paddingBottom: "32px" };
+  const mobileHeaderStyle = { paddingTop: "0px", marginBottom: "2px" };
+
   if (loading) return null;
 
   return (
     <div style={styles.page}>
-      <div style={styles.content}>
-        <header style={styles.header}>
+      <div style={mergeStyles(styles.content, mobileContentStyle)}>
+        <header style={mergeStyles(styles.header, mobileHeaderStyle)}>
           <h1 style={styles.title}>{categoryName}</h1>
         </header>
         <p style={styles.subtitle}>

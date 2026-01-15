@@ -1,4 +1,5 @@
 // pages/user/[username].js
+import React from "react";
 import { useRouter } from "next/router";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
@@ -17,13 +18,50 @@ export default function UserRankingsPage({ username, rows }) {
   const router = useRouter();
   const basePath = router.basePath || "";
 
+  // Mobile detection
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 600);
+    }
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Mobile table styles
+  const mobileTableStyles = {
+    rankCol: { width: "28px", padding: "6px 4px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
+    imageCol: { width: "40px", padding: "4px 2px", verticalAlign: "middle", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" },
+    nameCol: { padding: "6px 4px", width: "auto", verticalAlign: "middle", textAlign: "center" },
+    approvalCol: { width: "60px", padding: "6px 0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
+    votesCol: { width: "50px", padding: "6px 0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
+    nameLink: { fontSize: "13px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.2", textAlign: "center" },
+    row: { height: "40px" },
+    thumb: { width: 32, height: 32, borderRadius: 8 },
+    avatarPlaceholder: { width: 32, height: 32, borderRadius: 8, fontSize: "8px" },
+    approvalBadge: { fontSize: "13px", width: "44px", padding: "2px 0px" },
+    votesBadge: { fontSize: "10px", width: "32px", padding: "2px 4px" },
+    tableWrapper: { margin: "16px auto", width: "100%" },
+    table: { width: "100%" },
+  };
+
+  function mergeStyles(base, mobile) {
+    if (!isMobile) return base;
+    return { ...base, ...mobile };
+  }
+
+  // Mobile page style override - reduce padding; minimize top spacing
+  const mobilePageStyle = { paddingTop: "0px", paddingLeft: "10px", paddingRight: "10px", paddingBottom: "10px" };
+  const mobileHeaderStyle = { paddingTop: "0px", marginBottom: "2px" };
+
   const title = username
     ? `${username} - Personal Leaderboard`
     : "Personal Leaderboard";
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
+    <div style={mergeStyles(styles.page, mobilePageStyle)}>
+      <header style={mergeStyles(styles.header, mobileHeaderStyle)}>
         <h1 style={styles.title}>{title}</h1>
       </header>
       <p style={styles.subtitle}>
@@ -38,54 +76,54 @@ export default function UserRankingsPage({ username, rows }) {
       )}
 
       {rows.length > 0 && (
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
+        <div style={mergeStyles(styles.tableWrapper, mobileTableStyles.tableWrapper)}>
+          <table style={mergeStyles(styles.table, mobileTableStyles.table)}>
             <thead>
               <tr>
-                <th style={styles.rankCol}>Rank</th>
-                <th style={styles.imageCol}></th>
-                <th style={styles.nameCol}>Queen</th>
-                <th style={styles.approvalCol}>User approval</th>
-                <th style={styles.votesCol}>User votes</th>
+                <th style={mergeStyles(styles.rankCol, mobileTableStyles.rankCol)}>Rank</th>
+                <th style={mergeStyles(styles.imageCol, mobileTableStyles.imageCol)}></th>
+                <th style={mergeStyles(styles.nameCol, mobileTableStyles.nameCol)}>Queen</th>
+                <th style={mergeStyles(styles.approvalCol, mobileTableStyles.approvalCol)}>User approval</th>
+                <th style={mergeStyles(styles.votesCol, mobileTableStyles.votesCol)}>User votes</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((q) => (
-                <tr key={q.contestant_name} style={styles.row}>
-                  <td style={styles.rankCol}>{q.rank}</td>
-                  <td style={styles.imageCol}>
+                <tr key={q.contestant_name} style={mergeStyles(styles.row, mobileTableStyles.row)}>
+                  <td style={mergeStyles(styles.rankCol, mobileTableStyles.rankCol)}>{q.rank}</td>
+                  <td style={mergeStyles(styles.imageCol, mobileTableStyles.imageCol)}>
                     {q.image_url ? (
                       <img
                         src={queenThumbSrc(q.contestant_name, basePath)}
                         alt={`${q.contestant_name} thumbnail`}
-                        style={styles.thumb}
+                        style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
                         onError={(e) => {
                           e.currentTarget.src = `${basePath}/thumbnails/queens/_default.jpg`;
                         }}
                       />
                     ) : (
-                      <div style={styles.avatarPlaceholder}>No image</div>
+                      <div style={mergeStyles(styles.avatarPlaceholder, mobileTableStyles.avatarPlaceholder)}>No image</div>
                     )}
                   </td>
-                  <td style={styles.nameCol}>
+                  <td style={mergeStyles(styles.nameCol, mobileTableStyles.nameCol)}>
                     <span
-                      style={styles.nameLink}
+                      style={mergeStyles(styles.nameLink, mobileTableStyles.nameLink)}
                       onClick={() => router.push(`/queen/${q.slug}`)}
                     >
                       {q.contestant_name.toUpperCase()}
                     </span>
                   </td>
-                  <td style={styles.approvalCol}>
+                  <td style={mergeStyles(styles.approvalCol, mobileTableStyles.approvalCol)}>
                     {q.approvalPct != null ? (
-                      <span style={styles.approvalBadge}>
+                      <span style={mergeStyles(styles.approvalBadge, mobileTableStyles.approvalBadge)}>
                         {q.approvalPct.toFixed(1)}%
                       </span>
                     ) : (
                       <span style={styles.approvalLabel}>no votes yet</span>
                     )}
                   </td>
-                  <td style={styles.votesCol}>
-                    <span style={styles.votesBadge}>
+                  <td style={mergeStyles(styles.votesCol, mobileTableStyles.votesCol)}>
+                    <span style={mergeStyles(styles.votesBadge, mobileTableStyles.votesBadge)}>
                       {q.totalVotes} {q.totalVotes === 1 ? "vote" : "votes"}
                     </span>
                   </td>
@@ -239,7 +277,7 @@ const styles = {
   },
   page: {
     minHeight: "100vh",
-    background: "#1a0f08",
+    background: "#120902", // match global background
     color: "#fdf4e3",
     padding: "24px",
   },

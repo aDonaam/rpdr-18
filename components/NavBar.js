@@ -17,6 +17,16 @@ export default function NavBar() {
   const [categories, setCategories] = useState(() => []);
   const [openMenu, setOpenMenu] = useState(null); // "queens" | "categories" | null
   const [user, setUser] = useState(null);
+  // Mobile detection (CSR only)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 600);
+    }
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Only render dropdowns after queens/categories are loaded and valid
   const queensReady = Array.isArray(queens) && queens.length > 0 && queens.every(q => typeof q === "string");
@@ -116,26 +126,42 @@ export default function NavBar() {
     setOpenMenu(null);
   }
 
+  // Helper to merge base and mobile styles
+  function mergeStyles(base, mobile) {
+    if (!isMobile) return base;
+    return { ...base, ...mobile };
+  }
+
+  // Mobile style overrides
+  const mobileStyles = {
+    header: { padding: "4px 8px 2px" },
+    logoImg: { width: "120px" },
+    title: { fontSize: "14px" },
+    nav: { flexWrap: "wrap", gap: "10px", rowGap: "2px" },
+    navLink: { fontSize: "12px", padding: "2px 6px" },
+    navButton: { fontSize: "12px" },
+    dropdownItem: { fontSize: "12px", padding: "4px 8px" },
+    authBox: { fontSize: "11px" },
+  };
+
   return (
-    <header style={styles.header}>
+    <header style={mergeStyles(styles.header, mobileStyles.header)}>
       <div style={styles.topRow}>
         <img
           src="/rpdr-18/brand/s18-logo.png"
           alt="Season 18 logo"
-          style={styles.logoImg}
+          style={mergeStyles(styles.logoImg, mobileStyles.logoImg)}
         />
-        <h1 style={styles.title}>Season 18 Runway Review</h1>
+        <h1 style={mergeStyles(styles.title, mobileStyles.title)}>Season 18 Runway Review</h1>
       </div>
 
-
-      <nav style={styles.nav}>
+      <nav style={mergeStyles(styles.nav, mobileStyles.nav)}>
         {/* HOME */}
-        <Link href="/" style={styles.navLink}>
+        <Link href="/" style={mergeStyles(styles.navLink, mobileStyles.navLink)}>
           HOME
         </Link>
 
-        <Link href="/looks" style={styles.navLink}>ALL LOOKS</Link>
-
+        <Link href="/looks" style={mergeStyles(styles.navLink, mobileStyles.navLink)}>ALL LOOKS</Link>
 
         {/* QUEENS DROPDOWN */}
         {queensReady && (
@@ -143,11 +169,11 @@ export default function NavBar() {
             <button
               type="button"
               ref={queensBtnRef}
-              style={{ ...styles.navLink, ...styles.navButton, display: "flex", alignItems: "center", gap: 4 }}
+              style={{ ...mergeStyles(styles.navLink, mobileStyles.navLink), ...mergeStyles(styles.navButton, mobileStyles.navButton), display: "flex", alignItems: "center", gap: 4 }}
               onClick={() => toggleMenu("queens")}
             >
               <span>QUEENS</span>
-              <span style={{ fontSize: 14, marginLeft: 2 }}>▾</span>
+              <span style={{ fontSize: isMobile ? 11 : 14, marginLeft: 2 }}>▾</span>
             </button>
             {openMenu === "queens" && (
               <div style={styles.dropdownMenu} ref={queensMenuRef}>
@@ -155,7 +181,7 @@ export default function NavBar() {
                   <Link
                     key={q}
                     href={`/queen/${slugify(q)}`}
-                    style={styles.dropdownItem}
+                    style={mergeStyles(styles.dropdownItem, mobileStyles.dropdownItem)}
                     onClick={closeMenu}
                   >
                     {q}
@@ -172,11 +198,11 @@ export default function NavBar() {
             <button
               type="button"
               ref={categoriesBtnRef}
-              style={{ ...styles.navLink, ...styles.navButton, display: "flex", alignItems: "center", gap: 4 }}
+              style={{ ...mergeStyles(styles.navLink, mobileStyles.navLink), ...mergeStyles(styles.navButton, mobileStyles.navButton), display: "flex", alignItems: "center", gap: 4 }}
               onClick={() => toggleMenu("categories")}
             >
               <span>CATEGORIES</span>
-              <span style={{ fontSize: 14, marginLeft: 2 }}>▾</span>
+              <span style={{ fontSize: isMobile ? 11 : 14, marginLeft: 2 }}>▾</span>
             </button>
             {openMenu === "categories" && (
               <div style={styles.dropdownMenu} ref={categoriesMenuRef}>
@@ -184,7 +210,7 @@ export default function NavBar() {
                   <Link
                     key={c}
                     href={`/category/${slugify(c)}`}
-                    style={styles.dropdownItem}
+                    style={mergeStyles(styles.dropdownItem, mobileStyles.dropdownItem)}
                     onClick={closeMenu}
                   >
                     {c}
@@ -199,17 +225,17 @@ export default function NavBar() {
         {user ? (
           <Link
             href={`/user/${encodeURIComponent(user.username)}`}
-            style={styles.navLink}
+            style={mergeStyles(styles.navLink, mobileStyles.navLink)}
           >
             {user.username}
           </Link>
         ) : (
-          <Link href="/login" style={styles.navLink}>
+          <Link href="/login" style={mergeStyles(styles.navLink, mobileStyles.navLink)}>
             Log in
           </Link>
         )}
       </nav>
-      <div style={styles.authBox}>
+      <div style={mergeStyles(styles.authBox, mobileStyles.authBox)}>
         {user ? (
           <>
             <span style={styles.authText}>Logged in as: {user.username}</span>
