@@ -103,7 +103,7 @@ export default function LooksPage() {
   }, [user]);
 
   async function handleVote(lookUuid, value) {
-    if (!user) { window.location.href = "/login"; return; }
+    if (!user) { router.push("/login"); return; }
 
     // Update local state
     setVotes((prev) => ({ ...prev, [lookUuid]: value }));

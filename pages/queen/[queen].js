@@ -165,7 +165,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
   }, [user, router.isReady, router.query.queen]);
 
   async function handleVote(lookUuid, value) {
-    if (!user) { window.location.href = "/login"; return; }
+    if (!user) { router.push("/login"); return; }
 
     // Update local state
     setVotes((prev) => ({ ...prev, [lookUuid]: value }));
@@ -256,17 +256,17 @@ export async function getServerSideProps(context) {
     return { props: { initialLooks: [], queenName } };
   }
 
-  // Fetch all votes for these looks
-  const lookIds = looksRaw.map(l => l.look_id);
+  // Fetch all votes for these looks using the UUID (id field)
+  const lookIds = looksRaw.map(l => l.id);
   const { data: votesRaw, error: votesError } = await supabaseAdmin
     .from("votes")
-    .select("look_id, vote, user_id, updated_at")
-    .in("look_id", lookIds);
+    .select("look_uuid, vote, user_id, updated_at")
+    .in("look_uuid", lookIds);
 
   // Aggregate votes per look row
   const latestByUserLook = {};
   (votesRaw || []).forEach((row) => {
-    const lookId = String(row.look_id || "").trim();
+    const lookId = String(row.look_uuid || "").trim();
     const userId = String(row.user_id || "").trim();
     const vote = String(row.vote || "").toUpperCase().trim();
     if (!lookId || !userId) return;
@@ -286,7 +286,7 @@ export async function getServerSideProps(context) {
   });
 
   const looks = (looksRaw || []).map((look) => {
-    const g = grouped[look.look_id];
+    const g = grouped[look.id];
     if (!g || g.total === 0) {
       return { ...look, overallApproval: null, overallVoteCount: 0 };
     }

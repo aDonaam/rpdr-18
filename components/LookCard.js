@@ -10,7 +10,7 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
-export default function LookCard({ look, userVote, onVote, headerMode = "home" }) {
+export default function LookCard({ look, userVote, onVote, headerMode = "home", onCategoryClick, disableQueenLink }) {
   const [imgFailed, setImgFailed] = useState(false);
   const hasImageUrl = typeof look.image_url === "string" && look.image_url.trim().length > 0;
 
@@ -36,26 +36,8 @@ export default function LookCard({ look, userVote, onVote, headerMode = "home" }
   const [approval, setApproval] = useState(look.overallApproval);
   const [voteCount, setVoteCount] = useState(look.overallVoteCount);
 
-  // Fetch latest approval % and vote count from DB
-  async function fetchApproval() {
-    try {
-      const res = await fetch(`/api/looks-approval?look_uuid=${look.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setApproval(data.overallApproval);
-        setVoteCount(data.overallVoteCount);
-      }
-    } catch (err) {
-      // ignore
-    }
-  }
-
   useEffect(() => {
-    // Always fetch latest approval from API when userVote changes (vote submitted/changed)
-    fetchApproval();
-  }, [userVote]);
-
-  useEffect(() => {
+    // Update approval/vote count whenever the look prop changes
     setApproval(look.overallApproval);
     setVoteCount(look.overallVoteCount);
   }, [look.overallApproval, look.overallVoteCount]);
@@ -87,7 +69,7 @@ export default function LookCard({ look, userVote, onVote, headerMode = "home" }
       }
     }
     if (!userId) {
-      console.error("No userId found in rr_user. Please log in again.");
+      router.push("/login");
       return;
     }
     setSaving(true);
@@ -105,9 +87,6 @@ export default function LookCard({ look, userVote, onVote, headerMode = "home" }
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
         console.error("Vote save failed:", data || res.statusText);
-      } else {
-        // Fetch latest approval after successful vote
-        await fetchApproval();
       }
     } catch (err) {
       console.error("Error sending vote to Supabase:", err);
