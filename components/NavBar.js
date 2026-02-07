@@ -268,10 +268,11 @@ const styles = {
     left: 0,
     right: 0,
     padding: "10px 24px 6px",
-    background: "rgb(54, 28, 4)",
+    background: "#311202ff",
     borderBottom: "1px solid rgba(255, 255, 255, 0.07)",
     zIndex: 1000,
   },
+
   topRow: {
     display: "flex",
     flexDirection: "column",
