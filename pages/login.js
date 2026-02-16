@@ -108,8 +108,6 @@ export default function LoginPage() {
     maxWidth: "480px",
     margin: "40px auto",
     color: "#fff",
-    fontFamily:
-      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   };
 
   const inputStyle = {

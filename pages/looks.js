@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabaseClient";
 export default function LooksPage() {
     const router = useRouter();
   const [user, setUser] = useState(null);
+  const [userInitialized, setUserInitialized] = useState(false); // Track if user hydration is complete
   const [votes, setVotes] = useState({}); // { [look_id]: "TOOT" | "BOOT" }
   const [looks, setLooks] = useState([]); // [{...look, overallApproval, overallVoteCount}]
   const [loading, setLoading] = useState(true);
@@ -25,21 +26,24 @@ export default function LooksPage() {
     return { ...base, ...mobile };
   }
 
-  // On client load, read user from localStorage
+  // Initialize user from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedUser = window.localStorage.getItem("rr_user");
     if (savedUser) {
-      const parsed = JSON.parse(savedUser);
-      // Map userId to user_id for consistency
-      setUser({ ...parsed, user_id: parsed.userId });
+      try {
+        const parsed = JSON.parse(savedUser);
+        setUser({ ...parsed, user_id: parsed.userId || parsed.user_id || parsed.id });
+      } catch (err) {
+        console.error("Failed to parse stored user:", err);
+      }
     }
+    setUserInitialized(true);
   }, []);
 
-  // Fetch looks and votes from Supabase
+  // Fetch looks and global vote stats from Supabase (independent of user)
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
+    async function fetchLooks() {
       // Fetch all looks, including sequence
       const { data: looksData, error: looksError } = await supabase
         .from("looks")
@@ -48,14 +52,12 @@ export default function LooksPage() {
 
       if (looksError || !looksData) {
         setLooks([]);
-        setLoading(false);
         return;
       }
 
       // Fetch all votes for all looks
-      // Use id as look_uuid for votes, but also keep look_id for legacy/compat
       const lookIds = looksData.map(l => l.id);
-      const { data: allVotesData, error: votesError } = await supabase
+      const { data: allVotesData } = await supabase
         .from("votes")
         .select("look_uuid, vote")
         .in("look_uuid", lookIds);
@@ -73,19 +75,30 @@ export default function LooksPage() {
         const stats = lookStats[look.id] || { toot: 0, total: 0 };
         return {
           ...look,
-          look_id: look.look_id || look.id, // ensure look_id is present for compatibility
+          look_id: look.look_id || look.id,
           overallApproval: stats.total > 0 ? Math.round((stats.toot / stats.total) * 100) : null,
           overallVoteCount: stats.total,
         };
       });
+
       // Sort by sequence ascending, then queen alphabetically for ties
       looksWithStats.sort((a, b) => {
         if (a.sequence !== b.sequence) return a.sequence - b.sequence;
         return (a.contestant_name || "").localeCompare(b.contestant_name || "");
       });
-      setLooks(looksWithStats);
 
-      // Fetch votes for this user
+      setLooks(looksWithStats);
+      setLoading(false);
+    }
+
+    fetchLooks();
+  }, []);
+
+  // Fetch user's votes when user is initialized
+  useEffect(() => {
+    async function fetchUserVotes() {
+      if (!userInitialized) return;
+
       let userVotes = {};
       if (user && user.user_id) {
         const { data: userVotesData } = await supabase
@@ -97,10 +110,10 @@ export default function LooksPage() {
         });
       }
       setVotes(userVotes);
-      setLoading(false);
     }
-    fetchData();
-  }, [user]);
+
+    fetchUserVotes();
+  }, [user, userInitialized]);
 
   async function handleVote(lookUuid, value) {
     if (!user) { router.push("/login"); return; }
@@ -113,7 +126,7 @@ export default function LooksPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         look_uuid: lookUuid,
-        user_id: user.userId || user.user_id,
+        user_id: user.userId || user.user_id || user.id,
         vote: value,
       }),
     });
@@ -160,7 +173,7 @@ export default function LooksPage() {
             <LookCard
               key={look.id}
               look={look}
-              userVote={votes[look.id]}
+              userVote={votes[look.id] || null}
               onVote={(ignoredLookId, voteValue) => handleVote(look.id, voteValue)}
             />
           ))}
@@ -173,6 +186,8 @@ export default function LooksPage() {
 const styles = {
   page: {
     minHeight: "100vh",
+    background: "#120902",
+    color: "#feefd0",
   },
 
   content: {
@@ -185,31 +200,37 @@ const styles = {
     textAlign: "center",
   },
   title: {
-    fontSize: "26px",
-    fontWeight: 700,
-    letterSpacing: "0.04em",
+    fontSize: "32px",
+    fontWeight: 500,
+    letterSpacing: "0.06em",
     textTransform: "uppercase",
+    color: "#feefd0",
     margin: "0 0 6px 0",
     padding: 0,
     textAlign: "center",
+    lineHeight: "1.2",
   },
   userBox: {
     fontSize: "14px",
     opacity: 0.9,
   },
   link: {
-    color: "#f4c27a",            // gold accent
+    color: "#feefd0",
     textDecoration: "underline",
     cursor: "pointer",
   },
 
   subtitle: {
-    fontSize: "14px",
+    fontSize: "16px",
+    fontWeight: 300,
+    letterSpacing: "0.04em",
+    fontStyle: "italic",
     opacity: 0.9,
     maxWidth: "640px",
     margin: "0 auto 18px auto",
-    padding: "0 0 0 0",
+    padding: "12px 0",
     textAlign: "center",
+    color: "#facbb8",
   },
   cardGrid: {
     display: "grid",
@@ -233,7 +254,7 @@ const styles = {
     fontSize: "14px",
   },
   cardTitleLink: {
-    color: "#f9f5ff",
+    color: "#feefd0",
     textDecoration: "none",
   },
   pillLink: {
@@ -241,19 +262,20 @@ const styles = {
     color: "#f9f5ff",
   },
   pill: {
-    fontSize: "11px",
+    fontSize: "13px",
+    fontWeight: 400,
     textTransform: "uppercase",
-    letterSpacing: "0.08em",
+    letterSpacing: "0.04em",
     padding: "3px 8px",
     borderRadius: "999px",
-    background: "rgba(255, 179, 247, 0.12)",
-    border: "1px solid rgba(255, 179, 247, 0.5)",
-    color: "#f9f5ff",
+    background: "rgba(255, 180, 150, 0.16)",
+    border: "1px solid rgba(255, 180, 150, 0.7)",
+    color: "#feefd0",
   },
   imageLink: {
     fontSize: "13px",
     textDecoration: "underline",
-    color: "#c9a8ff",
+    color: "#feefd0",
   },
   cardFooter: {
     marginTop: "4px",
@@ -270,6 +292,8 @@ const styles = {
     borderRadius: "999px",
     padding: "6px 0",
     fontSize: "13px",
+    fontWeight: 400,
+    letterSpacing: "0.04em",
     border: "1px solid rgba(255, 255, 255, 0.35)",
     background: "rgba(0, 0, 0, 0.35)",
     color: "#f9f5ff",

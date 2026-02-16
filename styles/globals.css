@@ -6,6 +6,19 @@
   padding: 0;
 }
 
+:root {
+  /* Font family */
+  --font-sans: "Oswald", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  
+  /* Typography tokens */
+  --fw-body: 400;
+  --fw-ui: 400;
+  --fw-title: 600;
+  
+  --ls-ui: 0.04em;
+  --ls-title: 0.12em;
+}
+
 /* Make page fill window, dark background everywhere */
 html,
 body {
@@ -13,8 +26,8 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
- background-color: #120902;  /* deep bronze-brown */
-  color: #fef7e8;             /* warm off-white text */
+ background-color: #0c0c0c;  /* off black */
+  color: #feefd0;             /* light gold text */
   overflow-x: hidden;
 }
 
@@ -26,27 +39,42 @@ body {
 
 /* Base text styling */
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sans);
+  font-weight: var(--fw-body);
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Headings: a little runway editorial spacing */
+h1, h2, h3, .title, .page-title {
+  font-weight: var(--fw-title);
+  letter-spacing: var(--ls-title);
+  text-transform: uppercase;
+}
+
+/* Navigation, pills, buttons, small labels, table cells: lighter UI text */
+table, th, td, .table, .nav, .pill, .voteButton, button {
+  font-weight: var(--fw-ui);
+  letter-spacing: var(--ls-ui);
+  font-size: 13px;
+}
+
 /* Global link reset */
 a {
-  color: inherit !important;
-  text-decoration: none !important;
+  color: inherit;
+  text-decoration: none;
 }
 
-/* Make sure visited links don’t change color */
+/* Make sure visited links don't change color */
 a:visited {
-  color: inherit !important;
-  text-decoration: none !important;
+  color: inherit;
+  text-decoration: none;
 }
 
-/* Inside look cards, keep link text white, no underline */
+/* Inside look cards, keep link text light gold, no underline */
 .look-card a {
-  color: #fef7e8 !important;
+  color: #feefd0 !important;
   text-decoration: none !important;
 }
 

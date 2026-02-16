@@ -10,9 +10,15 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
-export default function LookCard({ look, userVote, onVote, headerMode = "home", onCategoryClick, disableQueenLink }) {
+export default function LookCard({ look, userVote = null, onVote, headerMode = "home", onCategoryClick, disableQueenLink }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const hasImageUrl = typeof look.image_url === "string" && look.image_url.trim().length > 0;
+
+  // Mark hydration complete after mount
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
 
   // Robust check for invalid look data
@@ -44,7 +50,7 @@ export default function LookCard({ look, userVote, onVote, headerMode = "home", 
 
   useEffect(() => {
     setImgFailed(false);
-  }, [look?.image_url]);
+  }, [look?.image_url, look?.id]);
 
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -149,11 +155,13 @@ export default function LookCard({ look, userVote, onVote, headerMode = "home", 
             src={look.image_url}
             alt={`${look.display_name || look.contestant_name} – ${look.category}`}
             style={styles.image}
-            onError={() => setImgFailed(true)}
+            onError={() => {
+              if (isHydrated) setImgFailed(true);
+            }}
           />
         </a>
       ) : (
-        <div style={styles.comingSoonBox}>
+        <div suppressHydrationWarning style={styles.comingSoonBox}>
           COMING SOON
         </div>
       )}
@@ -188,7 +196,7 @@ export default function LookCard({ look, userVote, onVote, headerMode = "home", 
       </div>
 
 
-      <div style={styles.voteNote}>
+      <div suppressHydrationWarning style={styles.voteNote}>
         {userVote === "TOOT"
           ? "You tooted this look."
           : userVote === "BOOT"
@@ -235,14 +243,15 @@ const styles = {
 
   pill: {
     display: "inline-block",
-    fontSize: "11px",
+    fontSize: "12px",
+    fontWeight: 300,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
     padding: "4px 12px",
     borderRadius: "999px",
-    background: "rgba(255, 180, 150, 0.16)",       // soft gold
+    background: "rgba(255, 180, 150, 0.16)",       // soft rose gold
     border: "1px solid rgba(255, 180, 150, 0.7)",
-    color: "#fee1d0",                               // light gold text
+    color: "#feefd0",                               // light gold text
     textAlign: "center",
     fontStyle: "italic",
     lineHeight: 1.2,
@@ -251,7 +260,7 @@ const styles = {
   },
 
   imageWrapper: {
-    marginTop: "6px",
+    marginTop: "3px",
     borderRadius: "12px",
     overflow: "hidden",
     display: "block",
@@ -275,57 +284,64 @@ const styles = {
   queenName: {
     textTransform: "uppercase",
     letterSpacing: "0.04em",
-    fontWeight: 700,
-    fontSize: "16px",
+    fontWeight: 500,
+    fontSize: "19px",
     display: "block",
     textAlign: "center",
-    color: "#fef7e8", // match global text
+    color: "#feefd0", // light gold
   },
 
   voteRow: {
-    marginTop: "8px",
+    marginTop: "6px",
     display: "flex",
     gap: "8px",
   },
   voteButton: {
     flex: 1,
     borderRadius: "999px",
-    padding: "6px 0",
-    fontSize: "13px",
+    padding: "4px 0",
+    fontSize: "15px",
+    fontWeight: 400,
+    letterSpacing: "0.04em",
     border: "1px solid rgba(255, 204, 128, 0.45)", // warm border
     background: "rgba(0, 0, 0, 0.35)",
-    color: "#fef7e8",
+    color: "#feefd0",
     cursor: "pointer",
+    fontFamily: "inherit",
   },
   voteButtonActiveToot: {
     background: "rgba(232, 202, 122, 0.95)",        // warm yellow
     borderColor: "rgba(232, 202, 122, 1)",
-    color: "#241b05",
-    fontWeight: 600,
+    color: "#241b05f1",
+    fontWeight: 500,
   },
   voteButtonActiveBoot: {
     background: "rgba(232, 142, 122, 0.95)",        // warm coral
     borderColor: "rgba(232, 142, 122, 1)",
-    color: "#3a120b",
-    fontWeight: 600,
+    color: "#3a120bf1",
+    fontWeight: 500,
   },
 
   voteNote: {
-    marginTop: "8px",
-    fontSize: "12px",
+    marginTop: "2px",
+    fontSize: "13px",
+    fontWeight: 300,
+    letterSpacing: "0.06em",
     opacity: 0.90,
     textAlign: "center",
-    color: "#fee1d0",
+    fontStyle: "italic",
+    color: "#feefd0",
   },
   publicNote: {
-    marginTop: 4,
-    fontSize: "11px",
-    color: "#f5b289",         // gold accent
+    fontSize: "12px",
+    fontWeight: 300,
+    letterSpacing: "0.06em",
+    color: "#facbb8",         // light gold
     textAlign: "center",
   },
 
   comingSoonBox: {
-    marginTop: "6px",
+    marginTop: "3px",
     borderRadius: "12px",
     overflow: "hidden",
     display: "flex",
@@ -339,10 +355,11 @@ const styles = {
     marginRight: "auto",
     background: "#1a0f08",
     border: "1px solid rgba(255, 204, 128, 0.35)",
-    fontWeight: 600,
-    letterSpacing: "0.12em",
+    fontSize: "20px",
+    fontWeight: 500,
+    letterSpacing: "0.04em",
     textTransform: "uppercase",
-    color: "rgba(253, 244, 227, 0.9)",
+    color: "#feefd0",
   }
 
 };
