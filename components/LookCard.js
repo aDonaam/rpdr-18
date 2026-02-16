@@ -205,7 +205,7 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
       </div>
 
       <div style={styles.publicNote}>
-        Overall approval: {typeof approval === "number" && voteCount > 0 ? `${approval}% (${voteCount} ${voteCount === 1 ? "vote" : "votes"})` : "No votes yet"}
+        Public approval: {typeof approval === "number" && voteCount > 0 ? `${approval}% (${voteCount} ${voteCount === 1 ? "vote" : "votes"})` : "No votes yet"}
       </div>
     </div>
   );
@@ -220,6 +220,7 @@ const styles = {
     border: "2px solid rgba(255, 180, 150, 0.35)", // warm gold border
     display: "flex",
     flexDirection: "column",
+    alignItems: "center",
     gap: "8px",
   },
 
@@ -263,14 +264,14 @@ const styles = {
     marginTop: "3px",
     borderRadius: "12px",
     overflow: "hidden",
-    display: "block",
-    border: "1px solid rgba(255, 204, 128, 0.35)", // gold-ish border
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "2px solid rgba(255, 180, 150, 0.35)", // warm gold border
     width: "100%",
     maxWidth: "275px",
     aspectRatio: "764 / 1079",
     /* height removed to let aspectRatio control height */
-    marginLeft: "auto",
-    marginRight: "auto",
     background: "#1a0f08",
   },
 
@@ -295,6 +296,9 @@ const styles = {
     marginTop: "6px",
     display: "flex",
     gap: "8px",
+    width: "100%",
+    paddingLeft: "0",
+    paddingRight: "0",
   },
   voteButton: {
     flex: 1,
@@ -327,7 +331,6 @@ const styles = {
     fontSize: "13px",
     fontWeight: 300,
     letterSpacing: "0.06em",
-    opacity: 0.90,
     textAlign: "center",
     fontStyle: "italic",
     color: "#feefd0",
@@ -351,10 +354,8 @@ const styles = {
     width: "100%",
     maxWidth: "275px",
     aspectRatio: "764 / 1079",
-    marginLeft: "auto",
-    marginRight: "auto",
     background: "#1a0f08",
-    border: "1px solid rgba(255, 204, 128, 0.35)",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
     fontSize: "20px",
     fontWeight: 500,
     letterSpacing: "0.04em",
