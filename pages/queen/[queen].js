@@ -1,5 +1,5 @@
 // pages/queen/[queen].js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import LookCard from "../../components/LookCard";
 import { supabase } from "../../lib/supabaseClient";
@@ -64,8 +64,10 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
   const [votes, setVotes] = useState({});
   const [looks, setLooks] = useState(initialLooks);
   const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-
+  const [isMobile, setIsMobile] = useState(false);  const [sortOption, setSortOption] = useState("chronological");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortBtnRef = useRef(null);
+  const sortMenuRef = useRef(null);
   useEffect(() => {
     function handleResize() {
       setIsMobile(window.innerWidth <= 600);
@@ -75,9 +77,44 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+
+    function handleClick(e) {
+      if (sortBtnRef.current?.contains(e.target) || sortMenuRef.current?.contains(e.target)) {
+        return;
+      }
+      setSortMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [sortMenuOpen]);
+
   function mergeStyles(base, mobile) {
     if (!isMobile) return base;
     return { ...base, ...mobile };
+  }
+
+  function getSortedLooks() {
+    const looksCopy = [...looks];
+    
+    if (sortOption === "approval") {
+      looksCopy.sort((a, b) => {
+        const approvalDiff = (b.overallApproval || 0) - (a.overallApproval || 0);
+        if (approvalDiff !== 0) return approvalDiff;
+        const voteCountDiff = (b.overallVoteCount || 0) - (a.overallVoteCount || 0);
+        if (voteCountDiff !== 0) return voteCountDiff;
+        return a.sequence - b.sequence;
+      });
+    } else {
+      looksCopy.sort((a, b) => {
+        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
+      });
+    }
+    
+    return looksCopy;
   }
 
   // Initialize user from localStorage on mount
@@ -231,8 +268,46 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
         <p style={styles.subtitle}>
           All looks walked by <b>{queenName}</b> this season.
         </p>
+        <div style={styles.sorterContainer}>
+          <button
+            type="button"
+            ref={sortBtnRef}
+            onClick={() => setSortMenuOpen(!sortMenuOpen)}
+            style={{
+              ...styles.sorterButton,
+              ...(sortMenuOpen ? styles.sorterButtonActive : {}),
+            }}
+          >
+            {sortOption === "chronological" ? "Chronological" : "Highest Public Approval"}
+            <span style={styles.sorterArrow}>▼</span>
+          </button>
+          {sortMenuOpen && (
+            <div style={styles.sorterMenu} ref={sortMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSortOption("chronological");
+                  setSortMenuOpen(false);
+                }}
+                style={styles.sorterMenuItem}
+              >
+                Chronological
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSortOption("approval");
+                  setSortMenuOpen(false);
+                }}
+                style={styles.sorterMenuItem}
+              >
+                Highest Public Approval
+              </button>
+            </div>
+          )}
+        </div>
         <div style={styles.cardGrid}>
-          {looks.map((look) => (
+          {getSortedLooks().map((look) => (
             <LookCard
               key={look.id}
               look={look}
@@ -364,7 +439,7 @@ const styles = {
     fontStyle: "italic",
     opacity: 0.9,
     maxWidth: "640px",
-    margin: "0 auto 18px auto",
+    margin: "0 auto 10px auto",
     padding: "12px 0",
     textAlign: "center",
     color: "#facbb8",
@@ -452,5 +527,70 @@ const styles = {
     marginTop: "4px",
     fontSize: "12px",
     opacity: 0.9,
+  },
+  sorterContainer: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "28px",
+    position: "relative",
+  },
+  sorterButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "8px 14px",
+    fontSize: "16px",
+    fontWeight: 400,
+    letterSpacing: "0.04em",
+    borderRadius: "16px",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "rgba(255, 195, 205, 0.12)",
+    color: "#feefd0",
+    cursor: "pointer",
+    fontFamily: "Oswald, sans-serif",
+    outline: "none",
+    textAlign: "center",
+    transition: "all 0.15s ease",
+    minWidth: "240px",
+    justifyContent: "center",
+  },
+  sorterButtonActive: {
+    background: "rgba(255, 195, 205, 0.18)",
+    border: "2px solid rgba(255, 180, 150, 0.45)",
+  },
+  sorterArrow: {
+    fontSize: "11px",
+    transition: "transform 0.2s ease",
+    display: "inline-block",
+  },
+  sorterMenu: {
+    position: "absolute",
+    top: "calc(100% + 4px)",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "240px",
+    background: "#0f0804",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    borderRadius: "16px",
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
+    zIndex: 1100,
+    overflow: "hidden",
+  },
+  sorterMenuItem: {
+    display: "block",
+    width: "100%",
+    padding: "8px 14px",
+    color: "#feefd0",
+    background: "transparent",
+    border: "none",
+    fontSize: "14px",
+    fontWeight: 300,
+    letterSpacing: "0.06em",
+    cursor: "pointer",
+    transition: "background-color 0.15s ease",
+    whiteSpace: "nowrap",
+    fontFamily: "Oswald, sans-serif",
+    textAlign: "left",
+    outline: "none",
   },
 };
