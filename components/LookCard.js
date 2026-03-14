@@ -155,9 +155,7 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
             src={look.image_url}
             alt={`${look.display_name || look.contestant_name} – ${look.category}`}
             style={styles.image}
-            onError={() => {
-              if (isHydrated) setImgFailed(true);
-            }}
+            onError={() => setImgFailed(true)}
           />
         </a>
       ) : (
