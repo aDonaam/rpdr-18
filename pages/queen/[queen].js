@@ -73,8 +73,10 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [publicApproval, setPublicApproval] = useState(null);
   const [publicRank, setPublicRank] = useState(initialPublicRank || null);
+  const [publicVoteCount, setPublicVoteCount] = useState(0);
   const [userApproval, setUserApproval] = useState(null);
   const [userRank, setUserRank] = useState(null);
+  const [userVoteCount, setUserVoteCount] = useState(0);
   const sortBtnRef = useRef(null);
   const sortMenuRef = useRef(null);
   const userRankDataCache = useRef(initialAllLooksData && initialAllVotesData ? { allLooks: initialAllLooksData, allVotes: initialAllVotesData } : null);
@@ -153,6 +155,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
       });
       const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
       setPublicApproval(publicApprovalPct);
+      setPublicVoteCount(publicTotal);
 
       // Calculate user approval for this queen
       let userToots = 0, userTotal = 0;
@@ -162,6 +165,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
       });
       const userApprovalPct = userTotal > 0 ? (userToots / userTotal) * 100 : null;
       setUserApproval(userApprovalPct);
+      setUserVoteCount(userTotal);
 
       // Calculate user ranking (only if user is logged in)
       if (user && user.user_id) {
@@ -351,12 +355,12 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
             <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
               <div style={styles.statLabel}>Public Approval</div>
               <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
-              {publicRank && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of 14</div>}
+              {publicRank && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of 14 ({publicVoteCount} {publicVoteCount === 1 ? "vote" : "votes"})</div>}
             </div>
             <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
               <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
               <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
-              {userRank && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of 14</div>}
+              {userRank && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of 14 ({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>}
             </div>
           </div>
         )}
@@ -747,7 +751,7 @@ const styles = {
     minWidth: "160px",
   },
   statLabel: {
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 400,
     letterSpacing: "0.06em",
     textTransform: "uppercase",

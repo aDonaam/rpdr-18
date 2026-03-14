@@ -65,7 +65,9 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
   const [isMobile, setIsMobile] = useState(false);  const [sortOption, setSortOption] = useState("chronological");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [publicApproval, setPublicApproval] = useState(null);
+  const [publicVoteCount, setPublicVoteCount] = useState(0);
   const [userApproval, setUserApproval] = useState(null);
+  const [userVoteCount, setUserVoteCount] = useState(0);
   const [publicRank, setPublicRank] = useState(initialPublicRank || null);
   const [userRank, setUserRank] = useState(null);
   const [totalCategories, setTotalCategories] = useState(initialTotalCategories || 0);
@@ -136,6 +138,7 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
       });
       const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
       setPublicApproval(publicApprovalPct);
+      setPublicVoteCount(publicTotal);
 
       // Calculate user approval for all looks in category
       let userToots = 0, userTotal = 0;
@@ -145,6 +148,7 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
       });
       const userApprovalPct = userTotal > 0 ? (userToots / userTotal) * 100 : null;
       setUserApproval(userApprovalPct);
+      setUserVoteCount(userTotal);
 
       // Calculate public rank across all categories
       try {
@@ -471,12 +475,12 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
           <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
             <div style={styles.statLabel}>Public Approval</div>
             <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
-            {publicRank && totalCategories > 0 && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of {totalCategories}</div>}
+            {publicRank && totalCategories > 0 && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of {totalCategories} ({publicVoteCount} {publicVoteCount === 1 ? "vote" : "votes"})</div>}
           </div>
           <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
             <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
             <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
-            {userRank && totalCategories > 0 && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of {totalCategories}</div>}
+            {userRank && totalCategories > 0 && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of {totalCategories} ({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>}
           </div>
         </div>
         <p style={styles.subtitle}>
@@ -825,7 +829,7 @@ const styles = {
     maxWidth: "280px",
   },
   statLabel: {
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 400,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
@@ -838,6 +842,7 @@ const styles = {
     fontWeight: 600,
     color: "#feefd0",
     fontFamily: "Oswald, sans-serif",
+    marginBottom: "6px",
   },
   statRank: {
     fontSize: "14px",
@@ -846,6 +851,7 @@ const styles = {
     color: "#facbb8",
     fontFamily: "Oswald, sans-serif",
     marginTop: "6px",
+    whiteSpace: "nowrap",
   },
   sorterContainer: {
     display: "flex",

@@ -14,7 +14,9 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
   const [sortOption, setSortOption] = useState("chronological"); // "chronological" or "approval"
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [publicApproval, setPublicApproval] = useState(initialPublicApproval);
+  const [publicVoteCount, setPublicVoteCount] = useState(0);
   const [userApproval, setUserApproval] = useState(initialUserApproval);
+  const [userVoteCount, setUserVoteCount] = useState(0);
   const sortBtnRef = useRef(null);
   const sortMenuRef = useRef(null);
 
@@ -68,6 +70,7 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
     });
     const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
     setPublicApproval(publicApprovalPct);
+    setPublicVoteCount(publicTotal);
 
     // Calculate user approval for all looks
     let userToots = 0, userTotal = 0;
@@ -77,6 +80,7 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
     });
     const userApprovalPct = userTotal > 0 ? (userToots / userTotal) * 100 : null;
     setUserApproval(userApprovalPct);
+    setUserVoteCount(userTotal);
   }, [looks, votes]);
 
   // Sort looks based on current sort option
@@ -201,10 +205,12 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
           <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
             <div style={styles.statLabel}>Public Approval</div>
             <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
+            <div style={styles.statRank}>({publicVoteCount} {publicVoteCount === 1 ? "vote" : "votes"})</div>
           </div>
           <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
             <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
             <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
+            <div style={styles.statRank}>({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>
           </div>
         </div>
         <p style={styles.subtitle}>All runway looks from Season 18</p>
@@ -415,7 +421,7 @@ const styles = {
     maxWidth: "280px",
   },
   statLabel: {
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 400,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
@@ -428,6 +434,15 @@ const styles = {
     fontWeight: 600,
     color: "#feefd0",
     fontFamily: "Oswald, sans-serif",
+    marginBottom: "6px",
+  },
+  statRank: {
+    fontSize: "14px",
+    fontWeight: 400,
+    letterSpacing: "0.04em",
+    color: "#facbb8",
+    fontFamily: "Oswald, sans-serif",
+    marginTop: "6px",
   },
   sorterContainer: {
     display: "flex",
