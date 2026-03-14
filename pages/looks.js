@@ -2,17 +2,19 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import LookCard from "../components/LookCard";
 import { supabase } from "../lib/supabaseClient";
+import { supabaseAdmin } from "../lib/supabaseAdmin";
 
-export default function LooksPage() {
+export default function LooksPage({ initialLooks = [], initialPublicApproval = null, initialUserApproval = null }) {
     const router = useRouter();
   const [user, setUser] = useState(null);
   const [userInitialized, setUserInitialized] = useState(false); // Track if user hydration is complete
   const [votes, setVotes] = useState({}); // { [look_id]: "TOOT" | "BOOT" }
-  const [looks, setLooks] = useState([]); // [{...look, overallApproval, overallVoteCount}]
-  const [loading, setLoading] = useState(true);
+  const [looks, setLooks] = useState(initialLooks); // [{...look, overallApproval, overallVoteCount}]
   const [isMobile, setIsMobile] = useState(false);
   const [sortOption, setSortOption] = useState("chronological"); // "chronological" or "approval"
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [publicApproval, setPublicApproval] = useState(initialPublicApproval);
+  const [userApproval, setUserApproval] = useState(initialUserApproval);
   const sortBtnRef = useRef(null);
   const sortMenuRef = useRef(null);
 
@@ -44,6 +46,38 @@ export default function LooksPage() {
     if (!isMobile) return base;
     return { ...base, ...mobile };
   }
+
+  const mobileApprovalHeaderStyle = { gap: "16px", flexDirection: "column" };
+
+  // Calculate overall approval stats
+  useEffect(() => {
+    if (looks.length === 0) {
+      setPublicApproval(null);
+      setUserApproval(null);
+      return;
+    }
+
+    // Calculate public approval for all looks
+    let publicToots = 0, publicTotal = 0;
+    looks.forEach((look) => {
+      if (look.overallApproval !== null) {
+        const tootCount = Math.round((look.overallApproval / 100) * look.overallVoteCount);
+        publicToots += tootCount;
+        publicTotal += look.overallVoteCount;
+      }
+    });
+    const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
+    setPublicApproval(publicApprovalPct);
+
+    // Calculate user approval for all looks
+    let userToots = 0, userTotal = 0;
+    looks.forEach((look) => {
+      if (votes[look.id] === "TOOT") userToots += 1;
+      if (votes[look.id]) userTotal += 1;
+    });
+    const userApprovalPct = userTotal > 0 ? (userToots / userTotal) * 100 : null;
+    setUserApproval(userApprovalPct);
+  }, [looks, votes]);
 
   // Sort looks based on current sort option
   function getSortedLooks() {
@@ -85,57 +119,11 @@ export default function LooksPage() {
   }, []);
 
   // Fetch looks and global vote stats from Supabase (independent of user)
+  // Data is pre-fetched on the server, so we don't need to fetch here
   useEffect(() => {
-    async function fetchLooks() {
-      // Fetch all looks, including sequence
-      const { data: looksData, error: looksError } = await supabase
-        .from("looks")
-        .select("id, display_name, contestant_name, category, sequence, image_url")
-        .order("sequence", { ascending: true });
-
-      if (looksError || !looksData) {
-        setLooks([]);
-        return;
-      }
-
-      // Fetch all votes for all looks
-      const lookIds = looksData.map(l => l.id);
-      const { data: allVotesData } = await supabase
-        .from("votes")
-        .select("look_uuid, vote")
-        .in("look_uuid", lookIds);
-
-      // Calculate approval % and vote count for each look
-      const lookStats = {};
-      (allVotesData || []).forEach((row) => {
-        if (!lookStats[row.look_uuid]) lookStats[row.look_uuid] = { toot: 0, total: 0 };
-        if (row.vote === "TOOT") lookStats[row.look_uuid].toot += 1;
-        lookStats[row.look_uuid].total += 1;
-      });
-
-      // Attach stats to looks
-      let looksWithStats = (looksData || []).map((look) => {
-        const stats = lookStats[look.id] || { toot: 0, total: 0 };
-        return {
-          ...look,
-          look_id: look.look_id || look.id,
-          overallApproval: stats.total > 0 ? Math.round((stats.toot / stats.total) * 100) : null,
-          overallVoteCount: stats.total,
-        };
-      });
-
-      // Sort by sequence ascending, then queen alphabetically for ties
-      looksWithStats.sort((a, b) => {
-        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
-      });
-
-      setLooks(looksWithStats);
-      setLoading(false);
-    }
-
-    fetchLooks();
-  }, []);
+    // Update looks state if initialLooks changes (e.g., during route changes)
+    setLooks(initialLooks);
+  }, [initialLooks]);
 
   // Fetch user's votes when user is initialized
   useEffect(() => {
@@ -202,14 +190,23 @@ export default function LooksPage() {
   const mobileContentStyle = { paddingTop: "0px", paddingLeft: "10px", paddingRight: "10px", paddingBottom: "32px" };
   const mobileHeaderStyle = { paddingTop: "0px", marginBottom: "2px" };
 
-  if (loading) return null;
-
   return (
     <div style={styles.page}>
       <div style={mergeStyles(styles.content, mobileContentStyle)}>
         <header style={mergeStyles(styles.header, mobileHeaderStyle)}>
-          <h1 style={styles.title}>All runway looks from Season 18</h1>
+          <h1 style={styles.title}>Season 18 - Full Catalog
+          </h1>
         </header>
+        <div style={mergeStyles(styles.approvalHeaderContainer, isMobile ? mobileApprovalHeaderStyle : {})}>
+          <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
+            <div style={styles.statLabel}>Public Approval</div>
+            <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
+          </div>
+          <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
+            <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
+            <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
+          </div>
+        </div>
         <p style={styles.subtitle}>All runway looks from Season 18</p>
         <div style={styles.sorterContainer}>
           <button
@@ -276,7 +273,7 @@ const styles = {
   },
 
   header: {
-    margin: "0 0 6px 0",
+    margin: "0",
     padding: "12px 0 0 0",
     textAlign: "center",
   },
@@ -286,7 +283,7 @@ const styles = {
     letterSpacing: "0.06em",
     textTransform: "uppercase",
     color: "#feefd0",
-    margin: "0 0 6px 0",
+    margin: "0 0 20px 0",
     padding: 0,
     textAlign: "center",
     lineHeight: "1.2",
@@ -308,8 +305,8 @@ const styles = {
     fontStyle: "italic",
     opacity: 0.9,
     maxWidth: "640px",
-    margin: "0 auto 10px auto",
-    padding: "12px 0",
+    margin: "0 auto 20px auto",
+    padding: "0",
     textAlign: "center",
     color: "#facbb8",
   },
@@ -397,10 +394,45 @@ const styles = {
     fontSize: "12px",
     opacity: 0.9,
   },
+  approvalHeaderContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "24px",
+    marginBottom: "24px",
+    padding: "0 12px",
+  },
+  queenStatCol: {
+    flex: "0 1 auto",
+    textAlign: "center",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "rgba(255, 195, 205, 0.12)",
+    minWidth: "180px",
+  },
+  queenStatColMobile: {
+    maxWidth: "280px",
+  },
+  statLabel: {
+    fontSize: "13px",
+    fontWeight: 400,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#facbb8",
+    marginBottom: "6px",
+    fontFamily: "Oswald, sans-serif",
+  },
+  statValue: {
+    fontSize: "28px",
+    fontWeight: 600,
+    color: "#feefd0",
+    fontFamily: "Oswald, sans-serif",
+  },
   sorterContainer: {
     display: "flex",
     justifyContent: "center",
-    marginBottom: "28px",
+    marginBottom: "36px",
     position: "relative",
   },
   sorterButton: {
@@ -463,3 +495,72 @@ const styles = {
     outline: "none",
   },
 };
+
+export async function getServerSideProps() {
+  // Fetch all looks, including sequence
+  const { data: looksData, error: looksError } = await supabaseAdmin
+    .from("looks")
+    .select("id, display_name, contestant_name, category, sequence, image_url")
+    .order("sequence", { ascending: true });
+
+  if (looksError || !looksData) {
+    return {
+      props: {
+        initialLooks: [],
+        initialPublicApproval: null,
+        initialUserApproval: null,
+      },
+    };
+  }
+
+  // Fetch all votes for all looks
+  const lookIds = looksData.map(l => l.id);
+  const { data: allVotesData } = await supabaseAdmin
+    .from("votes")
+    .select("look_uuid, vote")
+    .in("look_uuid", lookIds);
+
+  // Calculate approval % and vote count for each look
+  const lookStats = {};
+  (allVotesData || []).forEach((row) => {
+    if (!lookStats[row.look_uuid]) lookStats[row.look_uuid] = { toot: 0, total: 0 };
+    if (row.vote === "TOOT") lookStats[row.look_uuid].toot += 1;
+    lookStats[row.look_uuid].total += 1;
+  });
+
+  // Attach stats to looks
+  let looksWithStats = (looksData || []).map((look) => {
+    const stats = lookStats[look.id] || { toot: 0, total: 0 };
+    return {
+      ...look,
+      look_id: look.look_id || look.id,
+      overallApproval: stats.total > 0 ? Math.round((stats.toot / stats.total) * 100) : null,
+      overallVoteCount: stats.total,
+    };
+  });
+
+  // Sort by sequence ascending, then queen alphabetically for ties
+  looksWithStats.sort((a, b) => {
+    if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+    return (a.contestant_name || "").localeCompare(b.contestant_name || "");
+  });
+
+  // Calculate public approval for all looks
+  let publicToots = 0, publicTotal = 0;
+  looksWithStats.forEach((look) => {
+    if (look.overallApproval !== null) {
+      const tootCount = Math.round((look.overallApproval / 100) * look.overallVoteCount);
+      publicToots += tootCount;
+      publicTotal += look.overallVoteCount;
+    }
+  });
+  const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
+
+  return {
+    props: {
+      initialLooks: looksWithStats,
+      initialPublicApproval: publicApprovalPct,
+      initialUserApproval: null,
+    },
+  };
+}

@@ -13,6 +13,10 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
+function getQueenPortraitUrl(queenSlug) {
+  return `/thumbnails/queens/${queenSlug}.png`;
+}
+
 function enrichLooksWithApproval(looks, votesRaw) {
   const latestByUserLook = {}; // key: `${lookId}::${user}` -> { lookId, vote }
 
@@ -56,18 +60,37 @@ function enrichLooksWithApproval(looks, votesRaw) {
 }
 
 
-export default function QueenPage({ initialLooks, queenName: initialQueenName }) {
+export default function QueenPage({ initialLooks, queenName: initialQueenName, queenSlug: initialQueenSlug, initialPublicRank, allLooksData: initialAllLooksData, allVotesData: initialAllVotesData }) {
   const router = useRouter();
   const [queenName, setQueenName] = useState(initialQueenName);
+  const [queenSlug, setQueenSlug] = useState(initialQueenSlug);
   const [user, setUser] = useState(null);
-  const [userInitialized, setUserInitialized] = useState(false); // Track if user hydration is complete
+  const [userInitialized, setUserInitialized] = useState(false);
   const [votes, setVotes] = useState({});
   const [looks, setLooks] = useState(initialLooks);
-  const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);  const [sortOption, setSortOption] = useState("chronological");
+  const [isMobile, setIsMobile] = useState(false);
+  const [sortOption, setSortOption] = useState("chronological");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [publicApproval, setPublicApproval] = useState(null);
+  const [publicRank, setPublicRank] = useState(initialPublicRank || null);
+  const [userApproval, setUserApproval] = useState(null);
+  const [userRank, setUserRank] = useState(null);
   const sortBtnRef = useRef(null);
   const sortMenuRef = useRef(null);
+  const userRankDataCache = useRef(initialAllLooksData && initialAllVotesData ? { allLooks: initialAllLooksData, allVotes: initialAllVotesData } : null);
+
+  // Update cache when server props change
+  useEffect(() => {
+    if (initialAllLooksData && initialAllVotesData) {
+      userRankDataCache.current = { allLooks: initialAllLooksData, allVotes: initialAllVotesData };
+    }
+  }, [initialAllLooksData, initialAllVotesData]);
+
+  // Sync publicRank when initialPublicRank prop changes (e.g., during navigation)
+  useEffect(() => {
+    setPublicRank(initialPublicRank || null);
+  }, [initialPublicRank]);
+
   useEffect(() => {
     function handleResize() {
       setIsMobile(window.innerWidth <= 600);
@@ -117,6 +140,108 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
     return looksCopy;
   }
 
+  // Calculate approval stats and user ranking
+  useEffect(() => {
+    async function calculateStats() {
+      if (looks.length === 0) return;
+
+      // Calculate public approval for this queen
+      let publicToots = 0, publicTotal = 0;
+      looks.forEach((look) => {
+        publicToots += look.tootCount || 0;
+        publicTotal += look.overallVoteCount || 0;
+      });
+      const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
+      setPublicApproval(publicApprovalPct);
+
+      // Calculate user approval for this queen
+      let userToots = 0, userTotal = 0;
+      looks.forEach((look) => {
+        if (votes[look.id] === "TOOT") userToots += 1;
+        if (votes[look.id]) userTotal += 1;
+      });
+      const userApprovalPct = userTotal > 0 ? (userToots / userTotal) * 100 : null;
+      setUserApproval(userApprovalPct);
+
+      // Calculate user ranking (only if user is logged in)
+      if (user && user.user_id) {
+        try {
+          // Fetch all looks and votes once, then cache for subsequent use
+          let allLooks, allVotes;
+          if (!userRankDataCache.current) {
+            const { data: allLooksData } = await supabase
+              .from("looks")
+              .select("id, contestant_name");
+            const { data: allVotesData } = await supabase
+              .from("votes")
+              .select("look_uuid, vote, user_id");
+            userRankDataCache.current = { allLooks: allLooksData, allVotes: allVotesData };
+            allLooks = allLooksData;
+            allVotes = allVotesData;
+          } else {
+            allLooks = userRankDataCache.current.allLooks;
+            allVotes = userRankDataCache.current.allVotes;
+          }
+
+          if (allLooks && allVotes) {
+            const queenLooks = {};
+            allLooks.forEach((look) => {
+              if (!queenLooks[look.contestant_name]) {
+                queenLooks[look.contestant_name] = [];
+              }
+              queenLooks[look.contestant_name].push(look.id);
+            });
+
+            const queenUserApprovals = {};
+            Object.entries(queenLooks).forEach(([queen, lookIds]) => {
+              let toots = 0, total = 0;
+              (allVotes || []).forEach((vote) => {
+                if (vote.user_id === user.user_id && lookIds.includes(vote.look_uuid)) {
+                  if (vote.vote === "TOOT") toots += 1;
+                  total += 1;
+                }
+              });
+              queenUserApprovals[queen] = total > 0 ? (toots / total) * 100 : 0;
+            });
+
+            // Build array of queens with user approval percentages (only queens with votes)
+            const queenUserRows = Object.entries(queenUserApprovals)
+              .filter(([, approval]) => approval > 0)
+              .map(([name, approval]) => ({
+                name,
+                approval,
+              }));
+
+            // Sort by approval descending
+            queenUserRows.sort((a, b) => b.approval - a.approval);
+
+            // Assign ranks with tie handling (dense rank)
+            let lastApproval = null;
+            let currentRank = 0;
+            queenUserRows.forEach((row, index) => {
+              const approvalKey = row.approval.toFixed(6);
+              if (index === 0 || approvalKey !== lastApproval) {
+                currentRank = index + 1;
+                lastApproval = approvalKey;
+              }
+              row.rank = currentRank;
+            });
+
+            // Find rank of current queen
+            const currentQueenRow = queenUserRows.find((row) => row.name === queenName);
+            setUserRank(currentQueenRow ? currentQueenRow.rank : null);
+          }
+        } catch (err) {
+          console.error("Error calculating user ranking:", err);
+        }
+      } else {
+        setUserRank(null);
+      }
+    }
+
+    calculateStats();
+  }, [looks, votes, user, queenName]);
+
   // Initialize user from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -132,65 +257,12 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
     setUserInitialized(true);
   }, []);
 
-  // Fetch looks and global vote stats from Supabase (independent of user)
+  // Sync looks and queenName when initialLooks prop changes (e.g., during route changes)
   useEffect(() => {
-    async function fetchLooks() {
-      if (!router.isReady) return;
-      // Fetch all looks for this queen
-      const { data: looksData, error: looksError } = await supabase
-        .from("looks")
-        .select("id, look_id, display_name, contestant_name, contestant_slug, category, sequence, image_url")
-        .eq("contestant_slug", (router.query.queen || "").toLowerCase())
-        .order("sequence", { ascending: true });
-
-      if (looksError || !looksData) {
-        setLooks([]);
-        setQueenName("");
-        return;
-      }
-
-      // Use id as look_uuid for votes, but also keep look_id for legacy/compat
-      const lookIds = looksData.map(l => l.id);
-      const { data: allVotesData } = await supabase
-        .from("votes")
-        .select("look_uuid, vote")
-        .in("look_uuid", lookIds);
-
-      // Calculate approval % and vote count for each look
-      const lookStats = {};
-      (allVotesData || []).forEach((row) => {
-        if (!lookStats[row.look_uuid]) lookStats[row.look_uuid] = { toot: 0, total: 0 };
-        if (row.vote === "TOOT") lookStats[row.look_uuid].toot += 1;
-        lookStats[row.look_uuid].total += 1;
-      });
-
-      // Attach stats to looks
-      let looksWithStats = (looksData || []).map((look) => {
-        const stats = lookStats[look.id] || { toot: 0, total: 0 };
-        return {
-          ...look,
-          look_id: look.look_id || look.id,
-          overallApproval: stats.total > 0 ? Math.round((stats.toot / stats.total) * 100) : null,
-          overallVoteCount: stats.total,
-        };
-      });
-      // Sort by sequence ascending, then queen alphabetically for ties
-      looksWithStats.sort((a, b) => {
-        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
-      });
-      setLooks(looksWithStats);
-
-      // Update queenName from loaded data
-      if (looksData.length > 0) {
-        setQueenName(looksData[0].contestant_name || looksData[0].display_name || "");
-      } else {
-        setQueenName("");
-      }
-    }
-
-    fetchLooks();
-  }, [router.isReady, router.query.queen]);
+    setLooks(initialLooks);
+    setQueenName(initialQueenName || "");
+    setQueenSlug(initialQueenSlug || "");
+  }, [initialLooks, initialQueenName, initialQueenSlug]);
 
   // Fetch user's votes when user is initialized
   useEffect(() => {
@@ -208,7 +280,6 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
         });
       }
       setVotes(userVotes);
-      setLoading(false);
     }
 
     fetchUserVotes();
@@ -242,7 +313,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
           if (row.vote === "TOOT") toot += 1;
           total += 1;
         });
-        const overallApproval = total > 0 ? Math.round((toot / total) * 100) : null;
+        const overallApproval = total > 0 ? (toot / total) * 100 : null;
         setLooks((prevLooks) => prevLooks.map((look) =>
           look.id === lookUuid
             ? { ...look, overallApproval, overallVoteCount: total }
@@ -256,8 +327,8 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
 
   const mobileContentStyle = { paddingTop: "0px", paddingLeft: "10px", paddingRight: "10px", paddingBottom: "32px" };
   const mobileHeaderStyle = { paddingTop: "0px", marginBottom: "2px" };
-
-  if (loading) return null;
+  const mobilePortraitStyle = { width: "96px", height: "96px" };
+  const mobileStatBlockStyle = { minWidth: "140px", padding: "12px 16px" };
 
   return (
     <div style={styles.page}>
@@ -265,6 +336,30 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName })
         <header style={mergeStyles(styles.header, mobileHeaderStyle)}>
           <h1 style={styles.title}>{queenName}</h1>
         </header>
+        {queenSlug && (
+          <div style={mergeStyles(styles.queenHeaderContainer, isMobile ? styles.queenHeaderContainerMobile : {})}>
+            <div style={mergeStyles(styles.queenPortraitCol, isMobile ? styles.queenPortraitColMobile : {})}>
+              <img
+                src={`${router.basePath}${getQueenPortraitUrl(queenSlug)}`}
+                alt={`${queenName} portrait`}
+                style={{
+                  ...styles.portrait,
+                  ...(isMobile ? mobilePortraitStyle : {}),
+                }}
+              />
+            </div>
+            <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
+              <div style={styles.statLabel}>Public Approval</div>
+              <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
+              {publicRank && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of 14</div>}
+            </div>
+            <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
+              <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
+              <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
+              {userRank && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of 14</div>}
+            </div>
+          </div>
+        )}
         <p style={styles.subtitle}>
           All looks walked by <b>{queenName}</b> this season.
         </p>
@@ -376,10 +471,10 @@ export async function getServerSideProps(context) {
   const looks = (looksRaw || []).map((look) => {
     const g = grouped[look.id];
     if (!g || g.total === 0) {
-      return { ...look, overallApproval: null, overallVoteCount: 0 };
+      return { ...look, overallApproval: null, overallVoteCount: 0, tootCount: 0 };
     }
     const pct = Math.round((g.toot / g.total) * 100);
-    return { ...look, overallApproval: pct, overallVoteCount: g.total };
+    return { ...look, overallApproval: pct, overallVoteCount: g.total, tootCount: g.toot };
   });
   // Sort by sequence ascending, then display_name for ties
   looks.sort((a, b) => {
@@ -389,9 +484,68 @@ export async function getServerSideProps(context) {
 
   const queenNameFromData =
     (looksRaw && looksRaw[0] && (looksRaw[0].contestant_name || looksRaw[0].display_name)) || "";
+  const queenSlugFromData = (looksRaw && looksRaw[0] && looksRaw[0].contestant_slug) || "";
 
-  return { props: { initialLooks: looks, queenName: queenNameFromData } };
+  // Fetch ALL looks and ALL votes to calculate public ranking across all queens
+  const { data: allLooksData } = await supabaseAdmin
+    .from("looks")
+    .select("id, contestant_name");
 
+  const { data: allVotesData } = await supabaseAdmin
+    .from("votes")
+    .select("look_uuid, vote, user_id");
+
+  let initialPublicRank = null;
+  if (allLooksData && allVotesData) {
+    // Group looks by queen
+    const queenLooks = {};
+    allLooksData.forEach((look) => {
+      if (!queenLooks[look.contestant_name]) {
+        queenLooks[look.contestant_name] = [];
+      }
+      queenLooks[look.contestant_name].push(look.id);
+    });
+
+    // Calculate public approval per queen
+    const queenPublicApprovals = {};
+    Object.entries(queenLooks).forEach(([queenName, lookIds]) => {
+      let toots = 0, total = 0;
+      (allVotesData || []).forEach((vote) => {
+        if (lookIds.includes(vote.look_uuid)) {
+          if (vote.vote === "TOOT") toots += 1;
+          total += 1;
+        }
+      });
+      queenPublicApprovals[queenName] = total > 0 ? (toots / total) * 100 : 0;
+    });
+
+    // Build array of queens with approval percentages
+    const queenRows = Object.entries(queenPublicApprovals).map(([name, approval]) => ({
+      name,
+      approval,
+    }));
+
+    // Sort by approval descending
+    queenRows.sort((a, b) => b.approval - a.approval);
+
+    // Assign ranks with tie handling (dense rank)
+    let lastApproval = null;
+    let currentRank = 0;
+    queenRows.forEach((row, index) => {
+      const approvalKey = row.approval.toFixed(6);
+      if (index === 0 || approvalKey !== lastApproval) {
+        currentRank = index + 1;
+        lastApproval = approvalKey;
+      }
+      row.rank = currentRank;
+    });
+
+    // Find rank of current queen
+    const currentQueenRow = queenRows.find((row) => row.name === queenNameFromData);
+    initialPublicRank = currentQueenRow ? currentQueenRow.rank : null;
+  }
+
+  return { props: { initialLooks: looks, queenName: queenNameFromData, queenSlug: queenSlugFromData, initialPublicRank, allLooksData, allVotesData } };
 }
 
 
@@ -407,7 +561,7 @@ const styles = {
   },
 
   header: {
-    margin: "0 0 6px 0",
+    margin: "0 0 0 0",
     padding: "12px 0 0 0",
     textAlign: "center",
   },
@@ -417,7 +571,7 @@ const styles = {
     letterSpacing: "0.06em",
     textTransform: "uppercase",
     color: "#feefd0",
-    margin: "0 0 6px 0",
+    margin: "0 0 20px 0",
     padding: 0,
     textAlign: "center",
     lineHeight: "1.2",
@@ -439,8 +593,8 @@ const styles = {
     fontStyle: "italic",
     opacity: 0.9,
     maxWidth: "640px",
-    margin: "0 auto 10px auto",
-    padding: "12px 0",
+    margin: "0 auto 20px auto",
+    padding: "0",
     textAlign: "center",
     color: "#facbb8",
   },
@@ -528,10 +682,98 @@ const styles = {
     fontSize: "12px",
     opacity: 0.9,
   },
+  portraitSection: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "24px",
+  },
+  queenHeaderContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "24px",
+    marginBottom: "24px",
+    padding: "0 12px",
+  },
+  queenHeaderContainerMobile: {
+    flexDirection: "column",
+    gap: "20px",
+    padding: "0",
+  },
+  queenPortraitCol: {
+    display: "flex",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  queenPortraitColMobile: {
+    width: "100%",
+  },
+  queenStatCol: {
+    flex: "0 1 auto",
+    textAlign: "center",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "rgba(255, 195, 205, 0.12)",
+    minWidth: "180px",
+  },
+  queenStatColMobile: {
+    maxWidth: "280px",
+  },
+  portrait: {
+    width: "120px",
+    height: "120px",
+    objectFit: "cover",
+    borderRadius: "12px",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "rgba(255, 195, 205, 0.12)",
+  },
+  statRowContainer: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "24px",
+    marginBottom: "28px",
+  },
+  statRowContainerMobile: {
+    flexDirection: "column",
+    gap: "16px",
+  },
+  statBlock: {
+    padding: "16px 24px",
+    borderRadius: "12px",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "rgba(255, 195, 205, 0.12)",
+    textAlign: "center",
+    minWidth: "160px",
+  },
+  statLabel: {
+    fontSize: "13px",
+    fontWeight: 400,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#facbb8",
+    marginBottom: "6px",
+    fontFamily: "Oswald, sans-serif",
+  },
+  statValue: {
+    fontSize: "28px",
+    fontWeight: 600,
+    color: "#feefd0",
+    fontFamily: "Oswald, sans-serif",
+    marginBottom: "6px",
+  },
+  statRank: {
+    fontSize: "14px",
+    fontWeight: 400,
+    letterSpacing: "0.04em",
+    color: "#facbb8",
+    fontFamily: "Oswald, sans-serif",
+    marginTop: "6px",
+  },
   sorterContainer: {
     display: "flex",
     justifyContent: "center",
-    marginBottom: "28px",
+    marginBottom: "36px",
     position: "relative",
   },
   sorterButton: {

@@ -55,18 +55,30 @@ function enrichLooksWithApproval(looks, votesRaw) {
 }
 
 
-function CategoryPage({ initialLooks, categoryName: initialCategoryName }) {
+function CategoryPage({ initialLooks, categoryName: initialCategoryName, initialPublicRank, totalCategories: initialTotalCategories, allLooksData: initialAllLooksData, allVotesData: initialAllVotesData }) {
   const router = useRouter();
   const [categoryName, setCategoryName] = useState(initialCategoryName);
   const [user, setUser] = useState(null);
   const [userInitialized, setUserInitialized] = useState(false); // Track if user hydration is complete
   const [votes, setVotes] = useState({});
   const [looks, setLooks] = useState(initialLooks);
-  const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);  const [sortOption, setSortOption] = useState("chronological");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [publicApproval, setPublicApproval] = useState(null);
+  const [userApproval, setUserApproval] = useState(null);
+  const [publicRank, setPublicRank] = useState(initialPublicRank || null);
+  const [userRank, setUserRank] = useState(null);
+  const [totalCategories, setTotalCategories] = useState(initialTotalCategories || 0);
   const sortBtnRef = useRef(null);
   const sortMenuRef = useRef(null);
+  const userRankDataCache = useRef(initialAllLooksData && initialAllVotesData ? { allLooks: initialAllLooksData, allVotes: initialAllVotesData } : null);
+
+  // Update cache when server props change
+  useEffect(() => {
+    if (initialAllLooksData && initialAllVotesData) {
+      userRankDataCache.current = { allLooks: initialAllLooksData, allVotes: initialAllVotesData };
+    }
+  }, [initialAllLooksData, initialAllVotesData]);
   useEffect(() => {
     function handleResize() {
       setIsMobile(window.innerWidth <= 600);
@@ -75,6 +87,11 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName }) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Sync publicRank when initialPublicRank prop changes (e.g., during navigation)
+  useEffect(() => {
+    setPublicRank(initialPublicRank || null);
+  }, [initialPublicRank]);
 
   useEffect(() => {
     if (!sortMenuOpen) return;
@@ -94,6 +111,192 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName }) {
     if (!isMobile) return base;
     return { ...base, ...mobile };
   }
+
+  const mobileApprovalHeaderStyle = { gap: "16px", flexDirection: "column" };
+
+  // Calculate overall approval stats and ranking
+  useEffect(() => {
+    async function calculateStats() {
+      if (looks.length === 0) {
+        setPublicApproval(null);
+        setUserApproval(null);
+        setPublicRank(null);
+        setUserRank(null);
+        return;
+      }
+
+      // Calculate public approval for all looks in category
+      let publicToots = 0, publicTotal = 0;
+      looks.forEach((look) => {
+        if (look.overallApproval !== null) {
+          const tootCount = Math.round((look.overallApproval / 100) * look.overallVoteCount);
+          publicToots += tootCount;
+          publicTotal += look.overallVoteCount;
+        }
+      });
+      const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
+      setPublicApproval(publicApprovalPct);
+
+      // Calculate user approval for all looks in category
+      let userToots = 0, userTotal = 0;
+      looks.forEach((look) => {
+        if (votes[look.id] === "TOOT") userToots += 1;
+        if (votes[look.id]) userTotal += 1;
+      });
+      const userApprovalPct = userTotal > 0 ? (userToots / userTotal) * 100 : null;
+      setUserApproval(userApprovalPct);
+
+      // Calculate public rank across all categories
+      try {
+        let allLooksData, allVotesData;
+        if (!userRankDataCache.current) {
+          const result1 = await supabase
+            .from("looks")
+            .select("id, category");
+          const result2 = await supabase
+            .from("votes")
+            .select("look_uuid, vote");
+          allLooksData = result1.data;
+          allVotesData = result2.data;
+          userRankDataCache.current = { allLooks: allLooksData, allVotes: allVotesData };
+        } else {
+          allLooksData = userRankDataCache.current.allLooks;
+          allVotesData = userRankDataCache.current.allVotes;
+        }
+
+        if (allLooksData && allVotesData) {
+          // Group looks by category
+          const categoryLooks = {};
+          allLooksData.forEach((look) => {
+            if (!categoryLooks[look.category]) {
+              categoryLooks[look.category] = [];
+            }
+            categoryLooks[look.category].push(look.id);
+          });
+
+          // Calculate public approval per category
+          const categoryPublicApprovals = {};
+          Object.entries(categoryLooks).forEach(([cat, lookIds]) => {
+            let toots = 0, total = 0;
+            (allVotesData || []).forEach((vote) => {
+              if (lookIds.includes(vote.look_uuid)) {
+                if (vote.vote === "TOOT") toots += 1;
+                total += 1;
+              }
+            });
+            categoryPublicApprovals[cat] = total > 0 ? (toots / total) * 100 : 0;
+          });
+
+          // Build array of categories with approval percentages
+          const categoryRows = Object.entries(categoryPublicApprovals).map(([name, approval]) => ({
+            name,
+            approval,
+          }));
+
+          // Sort by approval descending
+          categoryRows.sort((a, b) => b.approval - a.approval);
+
+          // Assign ranks with tie handling (dense rank)
+          let lastApproval = null;
+          let currentRank = 0;
+          categoryRows.forEach((row, index) => {
+            const approvalKey = row.approval.toFixed(6);
+            if (index === 0 || approvalKey !== lastApproval) {
+              currentRank = index + 1;
+              lastApproval = approvalKey;
+            }
+            row.rank = currentRank;
+          });
+
+          // Set total categories
+          setTotalCategories(categoryRows.length);
+
+          // Find rank of current category
+          const currentCategoryRow = categoryRows.find((row) => row.name === categoryName);
+          setPublicRank(currentCategoryRow ? currentCategoryRow.rank : null);
+        }
+      } catch (err) {
+        console.error("Error calculating public rank:", err);
+      }
+
+      // Calculate user rank across all categories (only if user is logged in)
+      if (user && user.user_id) {
+        try {
+          let allLooksData, allVotesData;
+          if (!userRankDataCache.current) {
+            const result1 = await supabase
+              .from("looks")
+              .select("id, category");
+            const result2 = await supabase
+              .from("votes")
+              .select("look_uuid, vote, user_id");
+            allLooksData = result1.data;
+            allVotesData = result2.data;
+            userRankDataCache.current = { allLooks: allLooksData, allVotes: allVotesData };
+          } else {
+            allLooksData = userRankDataCache.current.allLooks;
+            allVotesData = userRankDataCache.current.allVotes;
+          }
+
+          if (allLooksData && allVotesData) {
+            const categoryLooks = {};
+            allLooksData.forEach((look) => {
+              if (!categoryLooks[look.category]) {
+                categoryLooks[look.category] = [];
+              }
+              categoryLooks[look.category].push(look.id);
+            });
+
+            const categoryUserApprovals = {};
+            Object.entries(categoryLooks).forEach(([cat, lookIds]) => {
+              let toots = 0, total = 0;
+              (allVotesData || []).forEach((vote) => {
+                if (vote.user_id === user.user_id && lookIds.includes(vote.look_uuid)) {
+                  if (vote.vote === "TOOT") toots += 1;
+                  total += 1;
+                }
+              });
+              categoryUserApprovals[cat] = total > 0 ? (toots / total) * 100 : 0;
+            });
+
+            // Build array of categories with user approval percentages (only categories with votes)
+            const categoryUserRows = Object.entries(categoryUserApprovals)
+              .filter(([, approval]) => approval > 0)
+              .map(([name, approval]) => ({
+                name,
+                approval,
+              }));
+
+            // Sort by approval descending
+            categoryUserRows.sort((a, b) => b.approval - a.approval);
+
+            // Assign ranks with tie handling (dense rank)
+            let lastApproval = null;
+            let currentRank = 0;
+            categoryUserRows.forEach((row, index) => {
+              const approvalKey = row.approval.toFixed(6);
+              if (index === 0 || approvalKey !== lastApproval) {
+                currentRank = index + 1;
+                lastApproval = approvalKey;
+              }
+              row.rank = currentRank;
+            });
+
+            // Find rank of current category
+            const currentCategoryRow = categoryUserRows.find((row) => row.name === categoryName);
+            setUserRank(currentCategoryRow ? currentCategoryRow.rank : null);
+          }
+        } catch (err) {
+          console.error("Error calculating user rank:", err);
+        }
+      } else {
+        setUserRank(null);
+      }
+    }
+
+    calculateStats();
+  }, [looks, votes, user, categoryName]);
+
 
   function getSortedLooks() {
     const looksCopy = [...looks];
@@ -210,7 +413,6 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName }) {
         });
       }
       setVotes(userVotes);
-      setLoading(false);
     }
 
     fetchUserVotes();
@@ -259,14 +461,24 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName }) {
   const mobileContentStyle = { paddingTop: "0px", paddingLeft: "10px", paddingRight: "10px", paddingBottom: "32px" };
   const mobileHeaderStyle = { paddingTop: "0px", marginBottom: "2px" };
 
-  if (loading) return null;
-
   return (
     <div style={styles.page}>
       <div style={mergeStyles(styles.content, mobileContentStyle)}>
         <header style={mergeStyles(styles.header, mobileHeaderStyle)}>
           <h1 style={styles.title}>{categoryName}</h1>
         </header>
+        <div style={mergeStyles(styles.approvalHeaderContainer, isMobile ? mobileApprovalHeaderStyle : {})}>
+          <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
+            <div style={styles.statLabel}>Public Approval</div>
+            <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
+            {publicRank && totalCategories > 0 && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of {totalCategories}</div>}
+          </div>
+          <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
+            <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
+            <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
+            {userRank && totalCategories > 0 && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of {totalCategories}</div>}
+          </div>
+        </div>
         <p style={styles.subtitle}>
           All looks in the <b>{categoryName}</b> category.
         </p>
@@ -394,7 +606,69 @@ export async function getServerSideProps(context) {
     return (a.display_name || "").localeCompare(b.display_name || "");
   });
 
-  return { props: { initialLooks: looks, categoryName: displayCategoryName } };
+  // Fetch ALL looks and ALL votes to calculate public ranking across all categories
+  const { data: allLooksData } = await supabaseAdmin
+    .from("looks")
+    .select("id, category");
+
+  const { data: allVotesData } = await supabaseAdmin
+    .from("votes")
+    .select("look_uuid, vote, user_id");
+
+  let initialPublicRank = null;
+  let totalCategories = 0;
+  if (allLooksData && allVotesData) {
+    // Group looks by category
+    const categoryLooks = {};
+    allLooksData.forEach((look) => {
+      if (!categoryLooks[look.category]) {
+        categoryLooks[look.category] = [];
+      }
+      categoryLooks[look.category].push(look.id);
+    });
+
+    // Calculate public approval per category
+    const categoryPublicApprovals = {};
+    Object.entries(categoryLooks).forEach(([cat, lookIds]) => {
+      let toots = 0, total = 0;
+      (allVotesData || []).forEach((vote) => {
+        if (lookIds.includes(vote.look_uuid)) {
+          if (vote.vote === "TOOT") toots += 1;
+          total += 1;
+        }
+      });
+      categoryPublicApprovals[cat] = total > 0 ? (toots / total) * 100 : 0;
+    });
+
+    // Build array of categories with approval percentages
+    const categoryRows = Object.entries(categoryPublicApprovals).map(([name, approval]) => ({
+      name,
+      approval,
+    }));
+
+    // Sort by approval descending
+    categoryRows.sort((a, b) => b.approval - a.approval);
+
+    // Assign ranks with tie handling (dense rank)
+    let lastApproval = null;
+    let currentRank = 0;
+    categoryRows.forEach((row, index) => {
+      const approvalKey = row.approval.toFixed(6);
+      if (index === 0 || approvalKey !== lastApproval) {
+        currentRank = index + 1;
+        lastApproval = approvalKey;
+      }
+      row.rank = currentRank;
+    });
+
+    totalCategories = categoryRows.length;
+
+    // Find rank of current category
+    const currentCategoryRow = categoryRows.find((row) => row.name === displayCategoryName);
+    initialPublicRank = currentCategoryRow ? currentCategoryRow.rank : null;
+  }
+
+  return { props: { initialLooks: looks, categoryName: displayCategoryName, initialPublicRank, totalCategories, allLooksData, allVotesData } };
 }
 
 const styles = {
@@ -409,7 +683,7 @@ const styles = {
   },
 
   header: {
-    margin: "0 0 6px 0",
+    margin: "0",
     padding: "12px 0 0 0",
     textAlign: "center",
   },
@@ -419,7 +693,7 @@ const styles = {
     letterSpacing: "0.06em",
     textTransform: "uppercase",
     color: "#feefd0",
-    margin: "0 0 6px 0",
+    margin: "0 0 20px 0",
     padding: 0,
     textAlign: "center",
     lineHeight: "1.2",
@@ -441,8 +715,8 @@ const styles = {
     fontStyle: "italic",
     opacity: 0.9,
     maxWidth: "640px",
-    margin: "0 auto 10px auto",
-    padding: "12px 0",
+    margin: "0 auto 20px auto",
+    padding: "0",
     textAlign: "center",
     color: "#facbb8",
   },
@@ -530,10 +804,53 @@ const styles = {
     fontSize: "12px",
     opacity: 0.9,
   },
+  approvalHeaderContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "24px",
+    marginBottom: "24px",
+    padding: "0 12px",
+  },
+  queenStatCol: {
+    flex: "0 1 auto",
+    textAlign: "center",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "rgba(255, 195, 205, 0.12)",
+    minWidth: "180px",
+  },
+  queenStatColMobile: {
+    maxWidth: "280px",
+  },
+  statLabel: {
+    fontSize: "13px",
+    fontWeight: 400,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: "#facbb8",
+    marginBottom: "6px",
+    fontFamily: "Oswald, sans-serif",
+  },
+  statValue: {
+    fontSize: "28px",
+    fontWeight: 600,
+    color: "#feefd0",
+    fontFamily: "Oswald, sans-serif",
+  },
+  statRank: {
+    fontSize: "14px",
+    fontWeight: 400,
+    letterSpacing: "0.04em",
+    color: "#facbb8",
+    fontFamily: "Oswald, sans-serif",
+    marginTop: "6px",
+  },
   sorterContainer: {
     display: "flex",
     justifyContent: "center",
-    marginBottom: "28px",
+    marginBottom: "36px",
     position: "relative",
   },
   sorterButton: {

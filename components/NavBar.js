@@ -18,7 +18,7 @@ export default function NavBar() {
   // Mobile detection
   useEffect(() => {
     function handleResize() {
-      setIsMobile(window.innerWidth <= 768);
+      setIsMobile(window.innerWidth <= 1164);
     }
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -394,7 +394,7 @@ const styles = {
   nav: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: "4px",
     position: "absolute",
     left: "50%",
     transform: "translateX(-50%)",
