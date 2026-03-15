@@ -39,12 +39,13 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
   }
 
   // Local state for approval and vote count
-  const [approval, setApproval] = useState(look.overallApproval);
+  const [approval, setApproval] = useState(look.overallApproval !== null ? Math.round(look.overallApproval) : null);
   const [voteCount, setVoteCount] = useState(look.overallVoteCount);
 
   useEffect(() => {
     // Update approval/vote count whenever the look prop changes
-    setApproval(look.overallApproval);
+    // Ensure approval is always an integer
+    setApproval(look.overallApproval !== null ? Math.round(look.overallApproval) : null);
     setVoteCount(look.overallVoteCount);
   }, [look.overallApproval, look.overallVoteCount]);
 
@@ -203,7 +204,7 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
       </div>
 
       <div style={styles.publicNote}>
-        Public approval: {typeof approval === "number" && voteCount > 0 ? `${approval}% (${voteCount} ${voteCount === 1 ? "vote" : "votes"})` : "No votes yet"}
+        Public approval: {typeof approval === "number" && voteCount > 0 ? `${Math.round(approval)}% (${voteCount} ${voteCount === 1 ? "vote" : "votes"})` : "No votes yet"}
       </div>
     </div>
   );

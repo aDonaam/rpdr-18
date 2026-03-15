@@ -159,7 +159,7 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
             .select("id, category");
           const result2 = await supabase
             .from("votes")
-            .select("look_uuid, vote");
+            .select("look_uuid, vote, user_id");
           allLooksData = result1.data;
           allVotesData = result2.data;
           userRankDataCache.current = { allLooks: allLooksData, allVotes: allVotesData };
@@ -260,15 +260,15 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
                   total += 1;
                 }
               });
-              categoryUserApprovals[cat] = total > 0 ? (toots / total) * 100 : 0;
+              categoryUserApprovals[cat] = total > 0 ? { approval: (toots / total) * 100, total } : null;
             });
 
             // Build array of categories with user approval percentages (only categories with votes)
             const categoryUserRows = Object.entries(categoryUserApprovals)
-              .filter(([, approval]) => approval > 0)
-              .map(([name, approval]) => ({
+              .filter(([, data]) => data !== null)
+              .map(([name, data]) => ({
                 name,
-                approval,
+                approval: data.approval,
               }));
 
             // Sort by approval descending
@@ -460,6 +460,9 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
     } catch (err) {
       // ignore
     }
+
+    // Clear rank calculation cache so fresh data is fetched on next calculateStats run
+    userRankDataCache.current = null;
   }
 
   const mobileContentStyle = { paddingTop: "0px", paddingLeft: "10px", paddingRight: "10px", paddingBottom: "32px" };
@@ -475,12 +478,12 @@ function CategoryPage({ initialLooks, categoryName: initialCategoryName, initial
           <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
             <div style={styles.statLabel}>Public Approval</div>
             <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
-            {publicRank && totalCategories > 0 && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of {totalCategories} ({publicVoteCount} {publicVoteCount === 1 ? "vote" : "votes"})</div>}
+            {publicRank && totalCategories > 0 && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of {totalCategories} categories ({publicVoteCount} {publicVoteCount === 1 ? "vote" : "votes"})</div>}
           </div>
           <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
             <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
             <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
-            {userRank && totalCategories > 0 && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of {totalCategories} ({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>}
+            {userVoteCount > 0 && totalCategories > 0 && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of {totalCategories} categories ({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>}
           </div>
         </div>
         <p style={styles.subtitle}>
@@ -823,7 +826,7 @@ const styles = {
     borderRadius: "12px",
     border: "2px solid rgba(255, 180, 150, 0.35)",
     background: "rgba(255, 195, 205, 0.12)",
-    minWidth: "180px",
+    minWidth: "188px",
   },
   queenStatColMobile: {
     maxWidth: "280px",

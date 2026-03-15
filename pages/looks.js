@@ -279,7 +279,7 @@ const styles = {
   },
 
   header: {
-    margin: "0",
+    margin: "0 0 0 0",
     padding: "12px 0 0 0",
     textAlign: "center",
   },
@@ -415,7 +415,7 @@ const styles = {
     borderRadius: "12px",
     border: "2px solid rgba(255, 180, 150, 0.35)",
     background: "rgba(255, 195, 205, 0.12)",
-    minWidth: "180px",
+    minWidth: "188px",
   },
   queenStatColMobile: {
     maxWidth: "280px",
