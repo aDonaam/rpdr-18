@@ -1,16 +1,19 @@
 // pages/login.js
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 
 export default function LoginPage() {
   const router = useRouter();
   const basePath = router.basePath || "";
 
-
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+
+  // Store refs to input elements to forcefully manage their styles
+  const usernameInputRef = useRef(null);
+  const pinInputRef = useRef(null);
 
   // If user already saved, pre-fill username
   useEffect(() => {
@@ -24,6 +27,37 @@ export default function LoginPage() {
         // ignore bad JSON
       }
     }
+  }, []);
+
+  // Force correct input colors to override browser autofill on page refresh
+  useEffect(() => {
+    // Apply corrections immediately and repeatedly to beat autofill timing
+    const applyFix = () => {
+      const inputs = [usernameInputRef.current, pinInputRef.current];
+      inputs.forEach((input) => {
+        if (!input) return;
+        
+        // Force remove autofill styles by setting properties directly on the DOM
+        input.style.backgroundColor = 'rgba(255, 195, 205, 0.12)';
+        input.style.WebkitTextFillColor = '#feefd0';
+        input.style.color = '#feefd0';
+        input.style.borderColor = 'rgba(255, 180, 150, 0.35)';
+        
+        // Also reset the webkit autofill pseudo-element appearance by removing and re-adding the element
+        input.style.webkitUserSelect = 'textfield';
+      });
+    };
+
+    // Run immediately (synchronously after refs are set)
+    applyFix();
+    
+    // Continue running at short intervals during component mount
+    const timers = [];
+    for (let i = 1; i <= 20; i++) {
+      timers.push(setTimeout(applyFix, i * 25));
+    }
+
+    return () => timers.forEach(clearTimeout);
   }, []);
 
   async function handleSubmit(e) {
@@ -107,28 +141,38 @@ export default function LoginPage() {
     padding: "40px",
     maxWidth: "480px",
     margin: "40px auto",
-    color: "#fff",
+    color: "#feefd0",
   };
 
   const inputStyle = {
     width: "100%",
-    padding: "10px 12px",
+    padding: "10px 14px",
     marginTop: "4px",
     marginBottom: "16px",
-    borderRadius: "999px",
-    border: "1px solid #555",
-    backgroundColor: "#1b1228",
-    color: "#fff",
+    borderRadius: "16px",
+    border: "2px solid rgba(255, 180, 150, 0.35)",
+    backgroundColor: "rgba(255, 195, 205, 0.12)",
+    color: "#feefd0",
     outline: "none",
+    fontSize: "14px",
+    fontWeight: 400,
+    letterSpacing: "0.04em",
+    fontFamily: "inherit",
+    textAlign: "left",
   };
 
   const buttonStyle = {
-    padding: "10px 20px",
-    borderRadius: "999px",
-    border: "none",
+    padding: "8px 20px",
+    borderRadius: "16px",
+    border: "2px solid rgba(232, 202, 122, 1)",
     cursor: "pointer",
-    backgroundColor: "#4ade80",
+    backgroundColor: "rgba(232, 202, 122, 0.95)",
+    color: "#241b05f1",
     fontWeight: 600,
+    fontSize: "14px",
+    letterSpacing: "0.04em",
+    marginTop: "8px",
+    fontFamily: "inherit",
   };
 
   const errorStyle = { color: "#f97373", marginTop: "8px" };
@@ -147,6 +191,7 @@ export default function LoginPage() {
         <label style={{ fontSize: "14px" }}>
           Username
           <input
+            ref={usernameInputRef}
             style={inputStyle}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -157,6 +202,7 @@ export default function LoginPage() {
         <label style={{ fontSize: "14px" }}>
           PIN
           <input
+            ref={pinInputRef}
             style={inputStyle}
             type="password"
             value={pin}

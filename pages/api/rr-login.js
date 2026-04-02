@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabaseAdmin
       .from("users")
       .select("user_id, username, pin_hash")
-      .eq("username", username.trim())
+      .ilike("username", username.trim())
       .maybeSingle();
 
     if (error) {
