@@ -479,7 +479,7 @@ const styles = {
 
   dropdownItem: {
     display: "block",
-    padding: "6px 14px",
+    padding: "4px 14px",
     color: "#feefd0",                                 // light gold text
     textDecoration: "none",
     fontSize: "14px",
