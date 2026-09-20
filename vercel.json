@@ -1,5 +1,3 @@
 {
-  "redirects": [
-    { "source": "/", "destination": "/rpdr-18", "permanent": true }
-  ]
+  "redirects": []
 }

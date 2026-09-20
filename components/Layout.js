@@ -2,7 +2,7 @@
 import React from "react";
 import NavBar from "./NavBar";
 
-export default function Layout({ children }) {
+export default function Layout({ children, seasonNav }) {
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
@@ -14,10 +14,14 @@ export default function Layout({ children }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // The season navbar is a season-site component: it only renders when a page
+  // explicitly supplies seasonNav (i.e. it lives within a resolved season site).
+  const showNavBar = !!seasonNav;
+
   return (
     <div style={styles.page}>
-      <NavBar />
-      <main style={isMobile ? { ...styles.main, ...styles.mainMobile } : styles.main}>
+      {showNavBar && <NavBar seasonNav={seasonNav} />}
+      <main style={showNavBar ? (isMobile ? { ...styles.main, ...styles.mainMobile } : styles.main) : styles.mainNoNav}>
         {children}
       </main>
     </div>
@@ -45,5 +49,8 @@ const styles = {
   },
   mainMobile: {
     paddingTop: MOBILE_NAVBAR_TOP_PADDING, // Mobile: navbar wraps and is taller, adjust as needed
+  },
+  mainNoNav: {
+    paddingTop: 0,
   },
 };

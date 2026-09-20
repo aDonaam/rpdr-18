@@ -1,19 +1,15 @@
 // pages/login.js
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const basePath = router.basePath || "";
 
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
-
-  // Store refs to input elements to forcefully manage their styles
-  const usernameInputRef = useRef(null);
-  const pinInputRef = useRef(null);
+  const [info, setInfo] = useState(
+    "Logging in will route you to the domain hub page."
+  );
 
   // If user already saved, pre-fill username
   useEffect(() => {
@@ -29,46 +25,14 @@ export default function LoginPage() {
     }
   }, []);
 
-  // Force correct input colors to override browser autofill on page refresh
-  useEffect(() => {
-    // Apply corrections immediately and repeatedly to beat autofill timing
-    const applyFix = () => {
-      const inputs = [usernameInputRef.current, pinInputRef.current];
-      inputs.forEach((input) => {
-        if (!input) return;
-        
-        // Force remove autofill styles by setting properties directly on the DOM
-        input.style.backgroundColor = 'rgba(255, 195, 205, 0.12)';
-        input.style.WebkitTextFillColor = '#feefd0';
-        input.style.color = '#feefd0';
-        input.style.borderColor = 'rgba(255, 180, 150, 0.35)';
-        
-        // Also reset the webkit autofill pseudo-element appearance by removing and re-adding the element
-        input.style.webkitUserSelect = 'textfield';
-      });
-    };
-
-    // Run immediately (synchronously after refs are set)
-    applyFix();
-    
-    // Continue running at short intervals during component mount
-    const timers = [];
-    for (let i = 1; i <= 20; i++) {
-      timers.push(setTimeout(applyFix, i * 25));
-    }
-
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
-    setInfo("");
 
     try {
       setInfo("Logging in...");
 
-      const res = await fetch(`${basePath}/api/rr-login`, {
+      const res = await fetch(`/api/rr-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, pin }),
@@ -101,7 +65,7 @@ export default function LoginPage() {
         (async () => {
           try {
             const r = await fetch(
-              `${basePath}/api/user-votes?user_id=${encodeURIComponent(data.userId)}`
+              `/api/user-votes?user_id=${encodeURIComponent(data.userId)}`
             );
 
             const ct2 = r.headers.get("content-type") || "";
@@ -121,103 +85,177 @@ export default function LoginPage() {
         })();
 
 
-        // 3) redirect immediately (IMPORTANT: include basePath)
-        window.location.replace(`${basePath}/user/${encodeURIComponent(data.username)}`);
+        // 3) redirect to the platform root (no contextual return-to-origin yet)
+        window.location.replace("/");
         return;
       } else {
         setError(data.error || "Login failed. Please try again.");
-        setInfo("");
+        setInfo("Logging in will route you to the domain hub page.");
         return;
       }
     } catch (err) {
       console.error("Login error", err);
-      setInfo("");
+      setInfo("Logging in will route you to the domain hub page.");
       setError(err?.message || "Network error while logging in.");
     }
   }
 
   // ----- styles -----
-  const containerStyle = {
-    padding: "40px",
-    maxWidth: "480px",
-    margin: "40px auto",
-    color: "#feefd0",
+  const pageStyle = {
+    minHeight: "100vh",
+    padding: "56px 24px",
+    background: "#0c0c0c",
+    color: "#e7e7e7",
+  };
+
+  const contentStyle = {
+    width: "100%",
+    maxWidth: "900px",
+    margin: "0 auto",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
+  };
+
+  const titleStyle = {
+    margin: 0,
+    height: "58px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "48px",
+    lineHeight: 1,
+    fontWeight: 800,
+    letterSpacing: "0.04em",
+  };
+
+  const descriptionStyle = {
+    maxWidth: "560px",
+    margin: "32px 0 0",
+    fontSize: "18px",
+    lineHeight: 1.5,
+  };
+
+  const formStyle = {
+    width: "100%",
+    maxWidth: "420px",
+    marginTop: "32px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    textAlign: "left",
+  };
+
+  const labelStyle = {
+    fontSize: "20px",
+    fontWeight: 600,
   };
 
   const inputStyle = {
+    boxSizing: "border-box",
     width: "100%",
-    padding: "10px 14px",
-    marginTop: "4px",
-    marginBottom: "16px",
-    borderRadius: "16px",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    backgroundColor: "rgba(255, 195, 205, 0.12)",
-    color: "#feefd0",
+    padding: "12px 14px",
+    marginTop: "8px",
+    marginBottom: "20px",
+    borderRadius: "8px",
+    border: "1px solid #f2f0eb",
+    backgroundColor: "#202020",
+    color: "#f2f0eb",
     outline: "none",
-    fontSize: "14px",
+    fontSize: "18px",
     fontWeight: 400,
-    letterSpacing: "0.04em",
     fontFamily: "inherit",
     textAlign: "left",
   };
 
   const buttonStyle = {
-    padding: "8px 20px",
-    borderRadius: "16px",
-    border: "2px solid rgba(232, 202, 122, 1)",
+    alignSelf: "center",
+    padding: "9px 18px",
+    borderRadius: "8px",
+    border: "1px solid #f2f0eb",
     cursor: "pointer",
-    backgroundColor: "rgba(232, 202, 122, 0.95)",
-    color: "#241b05f1",
+    backgroundColor: "#202020",
+    color: "#f2f0eb",
     fontWeight: 600,
-    fontSize: "14px",
-    letterSpacing: "0.04em",
-    marginTop: "8px",
+    fontSize: "20px",
     fontFamily: "inherit",
   };
 
-  const errorStyle = { color: "#f97373", marginTop: "8px" };
-  const infoStyle = { color: "#a5f3fc", marginTop: "8px" };
+  const returnLinkStyle = {
+    display: "inline-block",
+    marginTop: "32px",
+    padding: "9px 18px",
+    borderRadius: "8px",
+    border: "1px solid #f2f0eb",
+    background: "#202020",
+    color: "#f2f0eb",
+    textDecoration: "none",
+    fontSize: "20px",
+    fontWeight: 600,
+  };
+
+  const errorStyle = {
+    color: "#f97373",
+    marginTop: "16px",
+    textAlign: "center",
+  };
+
+  const infoStyle = {
+    color: "#e7e7e7",
+    marginTop: "16px",
+    textAlign: "center",
+  };
 
   // ----- component render -----
   return (
-    <div style={containerStyle}>
-      <h1 style={{ fontSize: "24px", marginBottom: "12px" }}>Log in with PIN</h1>
-      <p style={{ fontSize: "14px", lineHeight: 1.5, marginBottom: "24px" }}>
-        Enter the username and PIN provided to you. If you don&apos;t have an
-        account yet, please contact Andrew to be added to the project.
-      </p>
+    <div style={pageStyle}>
+      <main style={contentStyle}>
+        <h1 className="hub-title" style={titleStyle}>
+          LOG IN TO DONAAM.APP
+        </h1>
 
-      <form onSubmit={handleSubmit}>
-        <label style={{ fontSize: "14px" }}>
-          Username
-          <input
-            ref={usernameInputRef}
-            style={inputStyle}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="off"
-          />
-        </label>
+        <p style={descriptionStyle}>
+          Enter the username and PIN provided to you. If you don&apos;t have an
+          account yet, please contact Andrew to be added.
+        </p>
 
-        <label style={{ fontSize: "14px" }}>
-          PIN
-          <input
-            ref={pinInputRef}
-            style={inputStyle}
-            type="password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            autoComplete="off"
-          />
-        </label>
+        <form onSubmit={handleSubmit} style={formStyle}>
+          <label style={labelStyle}>
+            Username
+            <input
+              className="donaam-login-input"
+              style={inputStyle}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="off"
+            />
+          </label>
 
-        <button type="submit" style={buttonStyle}>
-          Continue
-        </button>
+          <label style={labelStyle}>
+            PIN
+            <input
+              className="donaam-login-input"
+              style={inputStyle}
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              autoComplete="off"
+            />
+          </label>
 
-        {error && <div style={errorStyle}>{error}</div>}
-        {info && <div style={infoStyle}>{info}</div>}
-      </form>
+          <button type="submit" style={buttonStyle}>
+            Log in
+          </button>
+
+          {error && <div style={errorStyle}>{error}</div>}
+          {info && <div style={infoStyle}>{info}</div>}
+        </form>
+
+        <Link href="/" style={returnLinkStyle}>
+          Return to domain hub
+        </Link>
+      </main>
     </div>
   );
 }

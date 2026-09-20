@@ -7,7 +7,7 @@ export default async function handler(req, res) {
       const { data, error } = await supabaseAdmin
         .from("looks")
         .select(
-          "id, look_id, display_name, contestant_name, category, sequence, image_url"
+          "id, look_id, display_name, contestant_name, category, sequence, image_path"
         )
         .order("sequence", { ascending: true, nullsLast: true })
         .order("contestant_name", { ascending: true }) // <-- was queen

@@ -1,22 +1,24 @@
-// pages/user/[username].js
+/**
+ * components/UserPage.js
+ *
+ * Shared presentation component for user-page (personal leaderboards) views.
+ * Used by both temporary (/user/[username]) and canonical
+ * (/drag-race/[franchise]/[season]/users/[username]) routes.
+ *
+ * All UI and styling is defined here. Routes inject season-aware data via props.
+ */
+
 import React from "react";
 import { useRouter } from "next/router";
-import { supabaseAdmin } from "../../lib/supabaseAdmin";
+import { seasonQueenRoute, seasonCategoryRoute } from "../lib/routeHelpers";
 
-function slugify(str) {
-  return (str || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+// Thumbnails are keyed by canonical queen slug (queens.slug), not the display name.
+function queenThumbSrc(slug, basePath = "") {
+  return `${basePath}/thumbnails/queens/${slug}.png`;
 }
 
-function queenThumbSrc(contestant_name, basePath = "") {
-  return `${basePath}/thumbnails/queens/${slugify(contestant_name)}.png`;
-}
-
-export default function UserRankingsPage({ username, displayUsername, rows, categories }) {
+export default function UserPage({ username, displayUsername, rows, categories, franchiseSlug, seasonNumber }) {
   const router = useRouter();
-  const basePath = router.basePath || "";
 
   // Mobile detection
   const [isMobile, setIsMobile] = React.useState(false);
@@ -110,18 +112,18 @@ export default function UserRankingsPage({ username, displayUsername, rows, cate
                     <td></td>
                   </tr>
                   {rows.map((q) => (
-                    <tr key={q.contestant_name} style={mergeStyles(styles.row, mobileTableStyles.row)}>
+                    <tr key={q.slug} style={mergeStyles(styles.row, mobileTableStyles.row)}>
                       <td style={mergeStyles(styles.rankCol, mobileTableStyles.rankCol)} className="rank-cell">
                         <span style={mergeStyles(styles.rankBadge, mobileTableStyles.rankBadge)}>{q.rank}</span>
                       </td>
                       <td style={mergeStyles(styles.imageCol, mobileTableStyles.imageCol)}>
-                        {q.image_url ? (
+                        {q.image_path ? (
                           <img
-                            src={queenThumbSrc(q.contestant_name, basePath)}
+                            src={queenThumbSrc(q.slug, "")}
                             alt={`${q.contestant_name} thumbnail`}
                             style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
                             onError={(e) => {
-                              e.currentTarget.src = `${basePath}/thumbnails/queens/_default.jpg`;
+                              e.currentTarget.src = `/thumbnails/queens/_default.jpg`;
                             }}
                           />
                         ) : (
@@ -131,7 +133,7 @@ export default function UserRankingsPage({ username, displayUsername, rows, cate
                       <td style={mergeStyles(styles.nameCol, mobileTableStyles.nameCol)}>
                         <span
                           style={mergeStyles(styles.nameLink, mobileTableStyles.nameLink)}
-                          onClick={() => router.push(`/queen/${q.slug}`)}
+                          onClick={() => franchiseSlug && router.push(seasonQueenRoute(franchiseSlug, seasonNumber, q.slug))}
                         >
                           {q.contestant_name.toUpperCase()}
                         </span>
@@ -200,7 +202,7 @@ export default function UserRankingsPage({ username, displayUsername, rows, cate
                       <td style={mergeStyles(styles.categoryNameCol, isMobile ? mobileTableStyles.categoryNameCol : {})}>
                         <span
                           style={mergeStyles(styles.categoryNameLink, isMobile ? mobileTableStyles.categoryNameLink : {})}
-                          onClick={() => router.push(`/category/${c.slug}`)}
+                          onClick={() => franchiseSlug && router.push(seasonCategoryRoute(franchiseSlug, seasonNumber, c.slug))}
                         >
                           {c.category.toUpperCase()}
                         </span>
@@ -237,206 +239,6 @@ export default function UserRankingsPage({ username, displayUsername, rows, cate
   );
 }
 
-export async function getServerSideProps(context) {
-  const usernameParam = context.params?.username || "";
-  const username = String(usernameParam).trim();
-  if (!username) {
-    return { props: { username: "", displayUsername: "", rows: [] } };
-  }
-
-  // Try to resolve username to user_id
-  let user_id = username;
-  let displayUsername = username;
-  // If username is not a UUID, look up user_id
-  if (!/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(username)) {
-    const { data: userRows } = await supabaseAdmin
-      .from('users')
-      .select('user_id, username')
-      .ilike('username', username);
-    if (userRows && userRows.length > 0) {
-      user_id = userRows[0].user_id;
-      displayUsername = userRows[0].username;
-    }
-  }
-
-  // Fetch all looks (use id as canonical look_uuid)
-  const { data: looks, error: looksError } = await supabaseAdmin
-    .from('looks')
-    .select('id, display_name, contestant_name, category, sequence, image_url');
-  if (looksError || !looks) {
-    return { props: { username, displayUsername, rows: [] } };
-  }
-
-  // Fetch all votes for this user (by user_id)
-  const { data: votes, error: votesError } = await supabaseAdmin
-    .from('votes')
-    .select('look_uuid, user_id, vote, updated_at')
-    .eq('user_id', user_id);
-  if (votesError || !votes) {
-    return { props: { username, displayUsername, rows: [] } };
-  }
-
-  // Build lookByUuid and queenInfo
-  const lookByUuid = {};
-  const queenInfo = {};
-  for (const look of looks) {
-    const lookUuid = String(look.id || "").trim();
-    if (!lookUuid) continue;
-    lookByUuid[lookUuid] = look;
-    if (!queenInfo[look.contestant_name]) {
-      queenInfo[look.contestant_name] = {
-        contestant_name: look.contestant_name,
-        display_name: look.display_name,
-        slug: slugify(look.contestant_name),
-        image_url: look.image_url,
-      };
-    }
-  }
-
-  // Only count the latest vote per (look_uuid, user_id)
-  const latestVoteByLookUser = {};
-  for (const v of votes) {
-    const lookUuid = String(v.look_uuid || '').trim();
-    const userId = String(v.user_id || '').trim();
-    const vote = String(v.vote || '').toUpperCase().trim();
-    if (!lookUuid || !userId) continue;
-    if (vote !== 'TOOT' && vote !== 'BOOT') continue;
-    const key = `${lookUuid}::${userId}`;
-    if (!latestVoteByLookUser[key] || new Date(v.updated_at) > new Date(latestVoteByLookUser[key].updated_at)) {
-      latestVoteByLookUser[key] = { lookUuid, userId, vote, updated_at: v.updated_at };
-    }
-  }
-
-  // Aggregate votes by queen (contestant_name), but include all queens from looks
-  const queenStats = {};
-  // First, initialize all queens from looks with zeroed stats
-  Object.values(queenInfo).forEach((info) => {
-    queenStats[info.contestant_name] = {
-      contestant_name: info.contestant_name,
-      display_name: info.display_name,
-      slug: info.slug,
-      image_url: info.image_url,
-      toots: 0,
-      boots: 0,
-      totalVotes: 0,
-      approvalPct: null,
-    };
-  });
-  // Then, add votes
-  for (const key in latestVoteByLookUser) {
-    const { lookUuid, vote } = latestVoteByLookUser[key];
-    const look = lookByUuid[lookUuid];
-    if (!look) continue;
-    const s = queenStats[look.contestant_name];
-    if (!s) continue;
-    if (vote === 'TOOT') s.toots += 1;
-    if (vote === 'BOOT') s.boots += 1;
-    s.totalVotes += 1;
-  }
-
-  // Calculate approval % and total votes
-  const rows = Object.values(queenStats).map((s) => {
-    if (s.totalVotes > 0) {
-      return { ...s, approvalPct: (s.toots / s.totalVotes) * 100 };
-    }
-    return { ...s, approvalPct: null };
-  });
-
-  // Sort by approval %, then total votes, then name
-  rows.sort((a, b) => {
-    if ((b.approvalPct ?? -1) !== (a.approvalPct ?? -1))
-      return (b.approvalPct ?? -1) - (a.approvalPct ?? -1);
-    if (b.totalVotes !== a.totalVotes) return b.totalVotes - a.totalVotes;
-    return (a.display_name || a.contestant_name || "").localeCompare(
-      b.display_name || b.contestant_name || ""
-    );
-  });
-
-  let lastPct = null;
-  let currentRank = 0;
-  rows.forEach((row, index) => {
-    const pctKey = row.approvalPct == null ? null : row.approvalPct.toFixed(6);
-    if (index === 0 || pctKey !== lastPct) {
-      currentRank = index + 1;
-      lastPct = pctKey;
-    }
-    row.rank = currentRank;
-  });
-
-  // Initialize category stats for categories that have votes from this user
-  const categorySet = new Set();
-  const categoryStats = {};
-  
-  // Collect categories from looks with votes from this user
-  for (const key in latestVoteByLookUser) {
-    const { lookUuid } = latestVoteByLookUser[key];
-    const look = lookByUuid[lookUuid];
-    if (look && look.category) {
-      categorySet.add(look.category);
-    }
-  }
-  
-  // Initialize category stats
-  categorySet.forEach((cat) => {
-    categoryStats[cat] = {
-      category: cat,
-      slug: slugify(cat),
-      toots: 0,
-      boots: 0,
-      totalVotes: 0,
-      approvalPct: null,
-    };
-  });
-  
-  // Aggregate votes by category
-  for (const key in latestVoteByLookUser) {
-    const { lookUuid, vote } = latestVoteByLookUser[key];
-    const look = lookByUuid[lookUuid];
-    if (!look || !look.category) continue;
-    const catStat = categoryStats[look.category];
-    if (!catStat) continue;
-    if (vote === 'TOOT') catStat.toots += 1;
-    if (vote === 'BOOT') catStat.boots += 1;
-    catStat.totalVotes += 1;
-  }
-  
-  // Calculate approval % for categories
-  const categoryRows = Object.values(categoryStats).map((s) => {
-    if (s.totalVotes > 0) {
-      return { ...s, approvalPct: (s.toots / s.totalVotes) * 100 };
-    }
-    return { ...s, approvalPct: null };
-  });
-  
-  // Sort categories by approval %, then total votes, then name
-  categoryRows.sort((a, b) => {
-    if ((b.approvalPct ?? -1) !== (a.approvalPct ?? -1))
-      return (b.approvalPct ?? -1) - (a.approvalPct ?? -1);
-    if (b.totalVotes !== a.totalVotes) return b.totalVotes - a.totalVotes;
-    return (a.category || "").localeCompare(b.category || "");
-  });
-  
-  // Dense rank categories
-  lastPct = null;
-  currentRank = 0;
-  categoryRows.forEach((row, index) => {
-    const pctKey = row.approvalPct == null ? null : row.approvalPct.toFixed(6);
-    if (index === 0 || pctKey !== lastPct) {
-      currentRank = index + 1;
-      lastPct = pctKey;
-    }
-    row.rank = currentRank;
-  });
-
-  return {
-    props: {
-      username,
-      displayUsername,
-      rows,
-      categories: categoryRows,
-    },
-  };
-}
 const styles = {
   rankBadge: {
     display: "inline-block",

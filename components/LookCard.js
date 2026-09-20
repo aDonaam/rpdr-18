@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useState, useMemo, useEffect } from "react";
+import { seasonQueenRoute, seasonCategoryRoute } from "../lib/routeHelpers";
 
 function slugify(str) {
   return (str || "")
@@ -10,10 +11,10 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
-export default function LookCard({ look, userVote = null, onVote, headerMode = "home", onCategoryClick, disableQueenLink }) {
+export default function LookCard({ look, userVote = null, onVote, headerMode = "home", onCategoryClick, disableQueenLink, franchiseSlug, seasonNumber }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
-  const hasImageUrl = typeof look.image_url === "string" && look.image_url.trim().length > 0;
+  const hasImageUrl = typeof look.image_path === "string" && look.image_path.trim().length > 0;
 
   // Mark hydration complete after mount
   useEffect(() => {
@@ -51,13 +52,20 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
 
   useEffect(() => {
     setImgFailed(false);
-  }, [look?.image_url, look?.id]);
+  }, [look?.image_path, look?.id]);
 
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
+  // All active callers (QueenPage, CategoryPage, canonical All Looks) supply
+  // season context; canonical slugs are preferred over re-derived legacy slugs.
+  const queenSlug = look.contestant_slug || slugify(look.contestant_name);
+  const categorySlugValue = look.categorySlug || look.category_slug || slugify(look.category);
+  const queenHref = seasonQueenRoute(franchiseSlug, seasonNumber, queenSlug);
+  const categoryHref = seasonCategoryRoute(franchiseSlug, seasonNumber, categorySlugValue);
+
   const goToQueen = () => {
-    router.push(`/queen/${slugify(look.contestant_name)}`);
+    router.push(queenHref);
   };
 
   async function handleClick(vote) {
@@ -81,7 +89,7 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
     }
     setSaving(true);
     try {
-      const res = await fetch(`${router.basePath}/api/vote`, {
+      const res = await fetch(`/api/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -129,7 +137,7 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
       <div style={styles.categoryWrapper}>
         {categoryIsLink ? (
           <Link
-            href={`/category/${slugify(look.category)}`}
+            href={categoryHref}
             style={styles.pillLink}
           >
             <span style={styles.pill}>{look.category}</span>
@@ -147,13 +155,13 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
 
       {hasImageUrl && !imgFailed ? (
         <a
-          href={look.image_url}
+          href={look.image_path}
           target="_blank"
           rel="noreferrer"
           style={styles.imageWrapper}
         >
           <img
-            src={look.image_url}
+            src={look.image_path}
             alt={`${look.display_name || look.contestant_name} – ${look.category}`}
             style={styles.image}
             onError={() => setImgFailed(true)}

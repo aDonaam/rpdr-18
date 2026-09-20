@@ -39,7 +39,7 @@ export default function App({ Component, pageProps }) {
 
   return (
     <div className={oswald.className}>
-      <Layout>
+      <Layout seasonNav={pageProps.seasonNav}>
         <Component {...pageProps} />
       </Layout>
     </div>

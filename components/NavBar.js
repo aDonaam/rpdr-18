@@ -1,11 +1,23 @@
 // components/NavBar.js
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/router";
+import {
+  dragRaceHomeRoute,
+  seasonRoute,
+  seasonLooksRoute,
+  seasonQueenRoute,
+  seasonCategoryRoute,
+  seasonUserRoute,
+} from "../lib/routeHelpers";
 
-export default function NavBar() {
-  const [queens, setQueens] = useState([]);
-  const [categories, setCategories] = useState([]);
+// Season 18 is the only season with a configured logo asset today; other
+// seasons render without a logo until the season display/theme system exists.
+const SEASON_LOGOS = {
+  18: { src: "/brand/s18-logo.png", alt: "Season 18" },
+};
+const DEFAULT_SEASON_NUMBER = 18;
+
+export default function NavBar({ seasonNav }) {
   const [openMenu, setOpenMenu] = useState(null);
   const [user, setUser] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -14,6 +26,19 @@ export default function NavBar() {
   const queensMenuRef = useRef(null);
   const categoriesBtnRef = useRef(null);
   const categoriesMenuRef = useRef(null);
+
+  const franchiseSlug = seasonNav?.franchiseSlug || null;
+  const seasonNumber = seasonNav?.seasonNumber ?? DEFAULT_SEASON_NUMBER;
+  const queens = seasonNav?.queens || [];
+  const categories = seasonNav?.categories || [];
+  const logo = SEASON_LOGOS[seasonNumber] || null;
+
+  // Canonical destinations require a resolved franchise/season; pages that
+  // don't supply seasonNav (e.g. login/admin) fall back to legacy routes.
+  const homeHref = franchiseSlug ? seasonRoute(franchiseSlug, seasonNumber) : "/";
+  const looksHref = franchiseSlug ? seasonLooksRoute(franchiseSlug, seasonNumber) : "/looks";
+  const userHref = (username) =>
+    franchiseSlug ? seasonUserRoute(franchiseSlug, seasonNumber, username) : `/user/${encodeURIComponent(username)}`;
 
   // Mobile detection
   useEffect(() => {
@@ -26,8 +51,8 @@ export default function NavBar() {
   }, []);
 
   // Ready states
-  const queensReady = Array.isArray(queens) && queens.length > 0 && queens.every(q => typeof q === "string");
-  const categoriesReady = Array.isArray(categories) && categories.length > 0 && categories.every(c => typeof c === "string");
+  const queensReady = queens.length > 0;
+  const categoriesReady = categories.length > 0;
 
   // User auth state
   useEffect(() => {
@@ -46,45 +71,6 @@ export default function NavBar() {
       window.removeEventListener("rr-auth-changed", readUser);
     };
   }, []);
-
-  // Fetch queens and categories
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const fetchOptions = async () => {
-      const { data: looks, error } = await require("../lib/supabaseClient").supabase
-        .from("looks")
-        .select("contestant_name, category, sequence");
-
-      if (!error && looks) {
-        // Unique queens, sorted alphabetically
-        const qSet = new Set();
-        looks.forEach(l => {
-          if (l.contestant_name && typeof l.contestant_name === "string") {
-            qSet.add(l.contestant_name);
-          }
-        });
-        const q = Array.from(qSet).sort((a, b) => a.localeCompare(b));
-
-        // Unique categories, sorted by sequence
-        const catMap = {};
-        looks.forEach(l => {
-          if (!catMap[l.category] || l.sequence < catMap[l.category]) {
-            catMap[l.category] = l.sequence;
-          }
-        });
-        const c = Object.entries(catMap)
-          .sort((a, b) => (a[1] ?? 99999) - (b[1] ?? 99999))
-          .map(([cat]) => cat);
-
-        setQueens(q);
-        setCategories(c);
-      }
-    };
-
-    fetchOptions();
-  }, []);
-
 
   function toggleMenu(name) {
     setOpenMenu((prev) => (prev === name ? null : name));
@@ -123,26 +109,28 @@ export default function NavBar() {
       <header style={isMobile ? styles.headerMobile : styles.header}>
         {/* Main nav bar */}
       <div style={isMobile ? styles.containerMobile : styles.container}>
-        {/* Logo + Brand */}
-        <div style={isMobile ? styles.brandMobile : styles.brand}>
-          <img
-            src="/rpdr-18/brand/s18-logo.png"
-            alt="Season 18"
-            style={isMobile ? styles.logoMobile : styles.logo}
-          />
+        {/* Logo + Brand (click navigates to the Drag Race project home) */}
+        <Link href={dragRaceHomeRoute()} style={isMobile ? { ...styles.brandMobile, textDecoration: "none", cursor: "pointer" } : { ...styles.brand, textDecoration: "none", cursor: "pointer" }}>
+          {logo && (
+            <img
+              src={logo.src}
+              alt={logo.alt}
+              style={isMobile ? styles.logoMobile : styles.logo}
+            />
+          )}
           <div style={isMobile ? styles.titleSectionMobile : styles.titleSection}>
-            <div style={isMobile ? styles.seasonLabelMobile : styles.seasonLabel}>Season 18</div>
+            <div style={isMobile ? styles.seasonLabelMobile : styles.seasonLabel}>Season {seasonNumber}</div>
             <h1 style={isMobile ? styles.titleMobile : styles.title}>Runway Review</h1>
           </div>
-        </div>
+        </Link>
 
         {/* Main Navigation */}
         <nav style={isMobile ? styles.navMobile : styles.nav}>
-          <Link href="/" style={isMobile ? { ...styles.navLink, ...styles.navLinkMobile } : styles.navLink}>
+          <Link href={homeHref} style={isMobile ? { ...styles.navLink, ...styles.navLinkMobile } : styles.navLink}>
             Home
           </Link>
 
-          <Link href="/looks" style={isMobile ? { ...styles.navLink, ...styles.navLinkMobile } : styles.navLink}>
+          <Link href={looksHref} style={isMobile ? { ...styles.navLink, ...styles.navLinkMobile } : styles.navLink}>
             All Looks
           </Link>
 
@@ -167,12 +155,12 @@ export default function NavBar() {
                 <div style={styles.dropdownMenu} ref={queensMenuRef}>
                   {queens.map((q) => (
                     <Link
-                      key={q}
-                      href={`/queen/${slugify(q)}`}
+                      key={q.slug}
+                      href={franchiseSlug ? seasonQueenRoute(franchiseSlug, seasonNumber, q.slug) : `/queen/${q.slug}`}
                       style={styles.dropdownItem}
                       onClick={closeMenu}
                     >
-                      {q}
+                      {q.displayName}
                     </Link>
                   ))}
                 </div>
@@ -201,12 +189,12 @@ export default function NavBar() {
                 <div style={isMobile ? { ...styles.dropdownMenu, ...styles.dropdownMenuMobile } : styles.dropdownMenu} ref={categoriesMenuRef}>
                   {categories.map((c) => (
                     <Link
-                      key={c}
-                      href={`/category/${slugify(c)}`}
+                      key={c.slug}
+                      href={franchiseSlug ? seasonCategoryRoute(franchiseSlug, seasonNumber, c.slug) : `/category/${c.slug}`}
                       style={styles.dropdownItem}
                       onClick={closeMenu}
                     >
-                      {c}
+                      {c.displayName}
                     </Link>
                   ))}
                 </div>
@@ -221,7 +209,7 @@ export default function NavBar() {
           {user ? (
             <>
               <Link
-                href={`/user/${encodeURIComponent(user.username)}`}
+                href={userHref(user.username)}
                 style={isMobile ? { ...styles.userLink, ...styles.userLinkMobile } : styles.userLink}
               >
                 {user.username}
@@ -240,13 +228,6 @@ export default function NavBar() {
       </header>
     </>
   );
-}
-
-function slugify(str) {
-  return (str || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 const styles = {

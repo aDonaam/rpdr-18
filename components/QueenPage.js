@@ -1,66 +1,24 @@
-// pages/queen/[queen].js
+/**
+ * components/QueenPage.js
+ *
+ * Shared presentation component for queen-page views.
+ * Used by both temporary (/queen/[queen]) and canonical (/drag-race/[franchise]/[season]/queens/[queen]) routes.
+ *
+ * All UI, state management, styling, and interactivity is defined here.
+ * Routes inject season-aware data via props.
+ */
+
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
-import LookCard from "../../components/LookCard";
-import { supabase } from "../../lib/supabaseClient";
-import { supabaseAdmin } from "../../lib/supabaseAdmin";
-
-
-function slugify(str) {
-  return (str || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+import LookCard from "./LookCard";
+import { supabase } from "../lib/supabaseClient";
+import { seasonCategoryRoute } from "../lib/routeHelpers";
 
 function getQueenPortraitUrl(queenSlug) {
   return `/thumbnails/queens/${queenSlug}.png`;
 }
 
-function enrichLooksWithApproval(looks, votesRaw) {
-  const latestByUserLook = {}; // key: `${lookId}::${user}` -> { lookId, vote }
-
-  (votesRaw || []).forEach((row) => {
-    const lookId = (row.look_id || "").trim();
-    const user = (row.user || "").trim();
-    const vote = (row.vote || "").toUpperCase().trim();
-
-    if (!lookId || !user) return;
-    if (vote !== "TOOT" && vote !== "BOOT") return;
-
-    const key = `${lookId}::${user}`;
-    latestByUserLook[key] = { lookId, vote };
-  });
-
-  const grouped = {}; // lookId -> { toot, total }
-  Object.values(latestByUserLook).forEach(({ lookId, vote }) => {
-    if (!grouped[lookId]) {
-      grouped[lookId] = { toot: 0, total: 0 };
-    }
-    grouped[lookId].total += 1;
-    if (vote === "TOOT") grouped[lookId].toot += 1;
-  });
-
-  return (looks || []).map((look) => {
-    const g = grouped[look.look_id];
-    if (!g || g.total === 0) {
-      return {
-        ...look,
-        overallApproval: null,
-        overallVoteCount: 0,
-      };
-    }
-    const pct = Math.round((g.toot / g.total) * 100);
-    return {
-      ...look,
-      overallApproval: pct,
-      overallVoteCount: g.total,
-    };
-  });
-}
-
-
-export default function QueenPage({ initialLooks, queenName: initialQueenName, queenSlug: initialQueenSlug, initialPublicRank, allLooksData: initialAllLooksData, allVotesData: initialAllVotesData }) {
+export default function QueenPage({ initialLooks, queenName: initialQueenName, queenSlug: initialQueenSlug, initialPublicRank, allLooksData: initialAllLooksData, allVotesData: initialAllVotesData, categorySequenceMap = {}, franchiseSlug, seasonNumber }) {
   const router = useRouter();
   const [queenName, setQueenName] = useState(initialQueenName);
   const [queenSlug, setQueenSlug] = useState(initialQueenSlug);
@@ -88,7 +46,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
     }
   }, [initialAllLooksData, initialAllVotesData]);
 
-  // Sync publicRank when initialPublicRank prop changes (e.g., during navigation)
+  // Sync publicRank when initialPublicRank prop changes
   useEffect(() => {
     setPublicRank(initialPublicRank || null);
   }, [initialPublicRank]);
@@ -123,22 +81,41 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
 
   function getSortedLooks() {
     const looksCopy = [...looks];
-    
+
+    // Category sequence is the authoritative season chronology; look.sequence only
+    // orders looks within the same category and may be null.
+    function categorySeq(look) {
+      return categorySequenceMap[look.category_id] ?? 999;
+    }
+    function lookSeq(look) {
+      return look.sequence !== null && look.sequence !== undefined ? look.sequence : 999;
+    }
+    function deterministicFallback(a, b) {
+      return String(a.look_id || a.id).localeCompare(String(b.look_id || b.id));
+    }
+
     if (sortOption === "approval") {
       looksCopy.sort((a, b) => {
         const approvalDiff = (b.overallApproval || 0) - (a.overallApproval || 0);
         if (approvalDiff !== 0) return approvalDiff;
         const voteCountDiff = (b.overallVoteCount || 0) - (a.overallVoteCount || 0);
         if (voteCountDiff !== 0) return voteCountDiff;
-        return a.sequence - b.sequence;
+        const catSeqDiff = categorySeq(a) - categorySeq(b);
+        if (catSeqDiff !== 0) return catSeqDiff;
+        const lookSeqDiff = lookSeq(a) - lookSeq(b);
+        if (lookSeqDiff !== 0) return lookSeqDiff;
+        return deterministicFallback(a, b);
       });
     } else {
       looksCopy.sort((a, b) => {
-        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
+        const catSeqDiff = categorySeq(a) - categorySeq(b);
+        if (catSeqDiff !== 0) return catSeqDiff;
+        const lookSeqDiff = lookSeq(a) - lookSeq(b);
+        if (lookSeqDiff !== 0) return lookSeqDiff;
+        return deterministicFallback(a, b);
       });
     }
-    
+
     return looksCopy;
   }
 
@@ -170,71 +147,64 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
       setUserApproval(userApprovalPct);
       setUserVoteCount(userTotal);
 
-      // Calculate public rank across all queens
+      // Calculate public rank across all queens (in this season)
       try {
         let allLooksData, allVotesData;
         if (!userRankDataCache.current) {
-          const result1 = await supabase
-            .from("looks")
-            .select("id, contestant_name");
-          const result2 = await supabase
-            .from("votes")
-            .select("look_uuid, vote, user_id");
-          allLooksData = result1.data;
-          allVotesData = result2.data;
-          userRankDataCache.current = { allLooks: allLooksData, allVotes: allVotesData };
+          // Should not happen if data loader passed data, but fallback just in case
+          setPublicRank(initialPublicRank || null);
         } else {
           allLooksData = userRankDataCache.current.allLooks;
           allVotesData = userRankDataCache.current.allVotes;
-        }
 
-        if (allLooksData && allVotesData) {
-          // Group looks by queen
-          const queenLooks = {};
-          allLooksData.forEach((look) => {
-            if (!queenLooks[look.contestant_name]) {
-              queenLooks[look.contestant_name] = [];
-            }
-            queenLooks[look.contestant_name].push(look.id);
-          });
-
-          // Calculate public approval per queen
-          const queenPublicApprovals = {};
-          Object.entries(queenLooks).forEach(([queen, lookIds]) => {
-            let toots = 0, total = 0;
-            (allVotesData || []).forEach((vote) => {
-              if (lookIds.includes(vote.look_uuid)) {
-                if (vote.vote === "TOOT") toots += 1;
-                total += 1;
+          if (allLooksData && allVotesData) {
+            // Group looks by queen
+            const queenLooks = {};
+            allLooksData.forEach((look) => {
+              if (!queenLooks[look.contestant_name]) {
+                queenLooks[look.contestant_name] = [];
               }
+              queenLooks[look.contestant_name].push(look.id);
             });
-            queenPublicApprovals[queen] = total > 0 ? (toots / total) * 100 : 0;
-          });
 
-          // Build array of queens with approval percentages
-          const queenRows = Object.entries(queenPublicApprovals).map(([name, approval]) => ({
-            name,
-            approval,
-          }));
+            // Calculate public approval per queen
+            const queenPublicApprovals = {};
+            Object.entries(queenLooks).forEach(([queen, lookIds]) => {
+              let toots = 0, total = 0;
+              (allVotesData || []).forEach((vote) => {
+                if (lookIds.includes(vote.look_uuid)) {
+                  if (vote.vote === "TOOT") toots += 1;
+                  total += 1;
+                }
+              });
+              queenPublicApprovals[queen] = total > 0 ? (toots / total) * 100 : 0;
+            });
 
-          // Sort by approval descending
-          queenRows.sort((a, b) => b.approval - a.approval);
+            // Build array of queens with approval percentages
+            const queenRows = Object.entries(queenPublicApprovals).map(([name, approval]) => ({
+              name,
+              approval,
+            }));
 
-          // Assign ranks with tie handling (dense rank)
-          let lastApproval = null;
-          let currentRank = 0;
-          queenRows.forEach((row, index) => {
-            const approvalKey = row.approval.toFixed(6);
-            if (index === 0 || approvalKey !== lastApproval) {
-              currentRank = index + 1;
-              lastApproval = approvalKey;
-            }
-            row.rank = currentRank;
-          });
+            // Sort by approval descending
+            queenRows.sort((a, b) => b.approval - a.approval);
 
-          // Find rank of current queen
-          const currentQueenRow = queenRows.find((row) => row.name === queenName);
-          setPublicRank(currentQueenRow ? currentQueenRow.rank : null);
+            // Assign ranks with tie handling (dense rank)
+            let lastApproval = null;
+            let currentRank = 0;
+            queenRows.forEach((row, index) => {
+              const approvalKey = row.approval.toFixed(6);
+              if (index === 0 || approvalKey !== lastApproval) {
+                currentRank = index + 1;
+                lastApproval = approvalKey;
+              }
+              row.rank = currentRank;
+            });
+
+            // Find rank of current queen
+            const currentQueenRow = queenRows.find((row) => row.name === queenName);
+            setPublicRank(currentQueenRow ? currentQueenRow.rank : null);
+          }
         }
       } catch (err) {
         console.error("Error calculating public rank:", err);
@@ -245,67 +215,59 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
         try {
           let allLooksData, allVotesData;
           if (!userRankDataCache.current) {
-            const result1 = await supabase
-              .from("looks")
-              .select("id, contestant_name");
-            const result2 = await supabase
-              .from("votes")
-              .select("look_uuid, vote, user_id");
-            allLooksData = result1.data;
-            allVotesData = result2.data;
-            userRankDataCache.current = { allLooks: allLooksData, allVotes: allVotesData };
+            setUserRank(null);
           } else {
             allLooksData = userRankDataCache.current.allLooks;
             allVotesData = userRankDataCache.current.allVotes;
-          }
 
-          if (allLooksData && allVotesData) {
-            const queenLooks = {};
-            allLooksData.forEach((look) => {
-              if (!queenLooks[look.contestant_name]) {
-                queenLooks[look.contestant_name] = [];
-              }
-              queenLooks[look.contestant_name].push(look.id);
-            });
-
-            const queenUserApprovals = {};
-            Object.entries(queenLooks).forEach(([queen, lookIds]) => {
-              let toots = 0, total = 0;
-              (allVotesData || []).forEach((vote) => {
-                if (vote.user_id === user.user_id && lookIds.includes(vote.look_uuid)) {
-                  if (vote.vote === "TOOT") toots += 1;
-                  total += 1;
+            if (allLooksData && allVotesData) {
+              const queenLooks = {};
+              allLooksData.forEach((look) => {
+                if (!queenLooks[look.contestant_name]) {
+                  queenLooks[look.contestant_name] = [];
                 }
+                queenLooks[look.contestant_name].push(look.id);
               });
-              queenUserApprovals[queen] = total > 0 ? { approval: (toots / total) * 100, total } : null;
-            });
 
-            // Build array of queens with user approval percentages (only queens with votes)
-            const queenUserRows = Object.entries(queenUserApprovals)
-              .filter(([, data]) => data !== null)
-              .map(([name, data]) => ({
-                name,
-                approval: data.approval,
-              }));
+              const queenUserApprovals = {};
+              Object.entries(queenLooks).forEach(([queen, lookIds]) => {
+                let toots = 0, total = 0;
+                (allVotesData || []).forEach((vote) => {
+                  if (vote.user_id === user.user_id && lookIds.includes(vote.look_uuid)) {
+                    if (vote.vote === "TOOT") toots += 1;
+                    total += 1;
+                  }
+                });
+                queenUserApprovals[queen] = total > 0 ? { approval: (toots / total) * 100, total } : null;
+              });
 
-            // Sort by approval descending
-            queenUserRows.sort((a, b) => b.approval - a.approval);
+              // Build array of queens with user approval percentages (only queens with votes)
+              const queenUserRows = Object.entries(queenUserApprovals)
+                .filter(([, data]) => data !== null)
+                .map(([name, data]) => ({
+                  name,
+                  approval: data.approval,
+                }));
 
-            // Assign ranks with tie handling (dense rank)
-            let lastApproval = null;
-            let currentRank = 0;
-            queenUserRows.forEach((row, index) => {
-              const approvalKey = row.approval.toFixed(6);
-              if (index === 0 || approvalKey !== lastApproval) {
-                currentRank = index + 1;
-                lastApproval = approvalKey;
-              }
-              row.rank = currentRank;
-            });
+              // Sort by approval descending
+              queenUserRows.sort((a, b) => b.approval - a.approval);
 
-            // Find rank of current queen
-            const currentQueenRow = queenUserRows.find((row) => row.name === queenName);
-            setUserRank(currentQueenRow ? currentQueenRow.rank : null);
+              // Assign ranks with tie handling (dense rank)
+              let lastApproval = null;
+              let currentRank = 0;
+              queenUserRows.forEach((row, index) => {
+                const approvalKey = row.approval.toFixed(6);
+                if (index === 0 || approvalKey !== lastApproval) {
+                  currentRank = index + 1;
+                  lastApproval = approvalKey;
+                }
+                row.rank = currentRank;
+              });
+
+              // Find rank of current queen
+              const currentQueenRow = queenUserRows.find((row) => row.name === queenName);
+              setUserRank(currentQueenRow ? currentQueenRow.rank : null);
+            }
           }
         } catch (err) {
           console.error("Error calculating user rank:", err);
@@ -333,7 +295,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
     setUserInitialized(true);
   }, []);
 
-  // Sync looks and queenName when initialLooks prop changes (e.g., during route changes)
+  // Sync looks and queenName when initialLooks prop changes
   useEffect(() => {
     setLooks(initialLooks);
     setQueenName(initialQueenName || "");
@@ -367,7 +329,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
     // Update local state
     setVotes((prev) => ({ ...prev, [lookUuid]: value }));
     // Persist to Supabase
-    await fetch(`${router.basePath}/api/vote`, {
+    await fetch(`/api/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -377,7 +339,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
       }),
     });
 
-    // Fetch latest approval and vote count for this look directly from Supabase for immediate update
+    // Fetch latest approval and vote count for this look
     try {
       const { data: votes, error } = await supabase
         .from("votes")
@@ -419,7 +381,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
           <div style={mergeStyles(styles.queenHeaderContainer, isMobile ? styles.queenHeaderContainerMobile : {})}>
             <div style={mergeStyles(styles.queenPortraitCol, isMobile ? styles.queenPortraitColMobile : {})}>
               <img
-                src={`${router.basePath}${getQueenPortraitUrl(queenSlug)}`}
+                src={getQueenPortraitUrl(queenSlug)}
                 alt={`${queenName} portrait`}
                 style={{
                   ...styles.portrait,
@@ -430,12 +392,12 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
             <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
               <div style={styles.statLabel}>Public Approval</div>
               <div style={styles.statValue}>{publicApproval !== null ? `${publicApproval.toFixed(1)}%` : "—"}</div>
-              {publicRank && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of 14 queens ({publicVoteCount} {publicVoteCount === 1 ? "vote" : "votes"})</div>}
+              {publicRank && <div style={styles.statRank}>{publicRank}{publicRank === 1 ? "st" : publicRank === 2 ? "nd" : publicRank === 3 ? "rd" : "th"} of {looks.length > 0 ? "all queens" : "—"} ({publicVoteCount} {publicVoteCount === 1 ? "vote" : "votes"})</div>}
             </div>
             <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
               <div style={styles.statLabel}>{user ? `${user.username}'s Approval` : "Your Approval"}</div>
               <div style={styles.statValue}>{userApproval !== null ? `${userApproval.toFixed(1)}%` : "—"}</div>
-              {userVoteCount > 0 && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of 14 queens ({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>}
+              {userVoteCount > 0 && <div style={styles.statRank}>{userRank}{userRank === 1 ? "st" : userRank === 2 ? "nd" : userRank === 3 ? "rd" : "th"} of all queens ({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>}
             </div>
           </div>
         )}
@@ -488,8 +450,10 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
               userVote={votes[look.id] || null}
               onVote={(ignoredLookId, voteValue) => handleVote(look.id, voteValue)}
               headerMode="queen"
+              franchiseSlug={franchiseSlug}
+              seasonNumber={seasonNumber}
               onCategoryClick={(categorySlug) => {
-                if (categorySlug) router.push(`/category/${categorySlug}`);
+                if (categorySlug && franchiseSlug && seasonNumber) router.push(seasonCategoryRoute(franchiseSlug, seasonNumber, categorySlug));
               }}
               disableQueenLink={true}
             />
@@ -498,135 +462,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
       </div>
     </div>
   );
-
 }
-
-export async function getServerSideProps(context) {
-  // Get queen name from URL param
-  const { queen } = context.params;
-  // Un-slugify if needed (replace dashes with spaces, capitalize)
-  const queenSlug = String(queen || "").toLowerCase();
-
-  const { data: looksRaw, error: looksError } = await supabaseAdmin
-    .from("looks")
-    .select("id, look_id, display_name, contestant_name, contestant_slug, category, sequence, image_url")
-    .eq("contestant_slug", queenSlug)
-    .order("sequence", { ascending: true });
-
-  if (looksError || !looksRaw) {
-    console.error("Supabase error:", looksError);
-    return { props: { initialLooks: [], queenName } };
-  }
-
-  // Fetch all votes for these looks using the UUID (id field)
-  const lookIds = looksRaw.map(l => l.id);
-  const { data: votesRaw, error: votesError } = await supabaseAdmin
-    .from("votes")
-    .select("look_uuid, vote, user_id, updated_at")
-    .in("look_uuid", lookIds);
-
-  // Aggregate votes per look row
-  const latestByUserLook = {};
-  (votesRaw || []).forEach((row) => {
-    const lookId = String(row.look_uuid || "").trim();
-    const userId = String(row.user_id || "").trim();
-    const vote = String(row.vote || "").toUpperCase().trim();
-    if (!lookId || !userId) return;
-    if (vote !== "TOOT" && vote !== "BOOT") return;
-    const key = `${lookId}::${userId}`;
-    if (!latestByUserLook[key] || new Date(row.updated_at) > new Date(latestByUserLook[key].updated_at)) {
-      latestByUserLook[key] = { lookId, vote, updated_at: row.updated_at };
-    }
-  });
-
-  // Calculate approval per look row
-  const grouped = {}; // lookId -> { toot, total }
-  Object.values(latestByUserLook).forEach(({ lookId, vote }) => {
-    if (!grouped[lookId]) grouped[lookId] = { toot: 0, total: 0 };
-    grouped[lookId].total += 1;
-    if (vote === "TOOT") grouped[lookId].toot += 1;
-  });
-
-  const looks = (looksRaw || []).map((look) => {
-    const g = grouped[look.id];
-    if (!g || g.total === 0) {
-      return { ...look, overallApproval: null, overallVoteCount: 0, tootCount: 0 };
-    }
-    const pct = Math.round((g.toot / g.total) * 100);
-    return { ...look, overallApproval: pct, overallVoteCount: g.total, tootCount: g.toot };
-  });
-  // Sort by sequence ascending, then display_name for ties
-  looks.sort((a, b) => {
-    if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-    return (a.display_name || a.contestant_name || "").localeCompare(b.display_name || b.contestant_name || "");
-  });
-
-  const queenNameFromData =
-    (looksRaw && looksRaw[0] && (looksRaw[0].contestant_name || looksRaw[0].display_name)) || "";
-  const queenSlugFromData = (looksRaw && looksRaw[0] && looksRaw[0].contestant_slug) || "";
-
-  // Fetch ALL looks and ALL votes to calculate public ranking across all queens
-  const { data: allLooksData } = await supabaseAdmin
-    .from("looks")
-    .select("id, contestant_name");
-
-  const { data: allVotesData } = await supabaseAdmin
-    .from("votes")
-    .select("look_uuid, vote, user_id");
-
-  let initialPublicRank = null;
-  if (allLooksData && allVotesData) {
-    // Group looks by queen
-    const queenLooks = {};
-    allLooksData.forEach((look) => {
-      if (!queenLooks[look.contestant_name]) {
-        queenLooks[look.contestant_name] = [];
-      }
-      queenLooks[look.contestant_name].push(look.id);
-    });
-
-    // Calculate public approval per queen
-    const queenPublicApprovals = {};
-    Object.entries(queenLooks).forEach(([queenName, lookIds]) => {
-      let toots = 0, total = 0;
-      (allVotesData || []).forEach((vote) => {
-        if (lookIds.includes(vote.look_uuid)) {
-          if (vote.vote === "TOOT") toots += 1;
-          total += 1;
-        }
-      });
-      queenPublicApprovals[queenName] = total > 0 ? (toots / total) * 100 : 0;
-    });
-
-    // Build array of queens with approval percentages
-    const queenRows = Object.entries(queenPublicApprovals).map(([name, approval]) => ({
-      name,
-      approval,
-    }));
-
-    // Sort by approval descending
-    queenRows.sort((a, b) => b.approval - a.approval);
-
-    // Assign ranks with tie handling (dense rank)
-    let lastApproval = null;
-    let currentRank = 0;
-    queenRows.forEach((row, index) => {
-      const approvalKey = row.approval.toFixed(6);
-      if (index === 0 || approvalKey !== lastApproval) {
-        currentRank = index + 1;
-        lastApproval = approvalKey;
-      }
-      row.rank = currentRank;
-    });
-
-    // Find rank of current queen
-    const currentQueenRow = queenRows.find((row) => row.name === queenNameFromData);
-    initialPublicRank = currentQueenRow ? currentQueenRow.rank : null;
-  }
-
-  return { props: { initialLooks: looks, queenName: queenNameFromData, queenSlug: queenSlugFromData, initialPublicRank, allLooksData, allVotesData } };
-}
-
 
 const styles = {
   page: {
@@ -636,7 +472,7 @@ const styles = {
   },
 
   content: {
-    padding: "0 24px 32px 24px", // left/right + bottom padding
+    padding: "0 24px 32px 24px",
   },
 
   header: {

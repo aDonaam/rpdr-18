@@ -1,18 +1,19 @@
 /**
- * pages/index.js
+ * pages/drag-race/index.js
  *
- * donaam platform root.
+ * Drag Race Fashion Review project root.
  *
- * Intentionally season-neutral: lists available projects and provides
- * platform-level login/logout access. This page supplies no seasonNav,
- * so the Drag Race season navbar does not render here.
+ * Lists valid seasons from the normalized franchises/seasons relationship
+ * (never inferred from `looks`). Supplies no seasonNav, so the season navbar
+ * does not render here - this page sits above any single season.
  */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { dragRaceHomeRoute } from "../lib/routeHelpers";
+import { getAvailableSeasons } from "../../lib/dragRaceProjectData";
+import { seasonRoute } from "../../lib/routeHelpers";
 
-export default function DonaamHome() {
+export default function DragRaceProjectHome({ seasons }) {
   const [username, setUsername] = useState(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -35,7 +36,7 @@ export default function DonaamHome() {
     <div style={styles.page}>
       <main style={styles.content}>
         <h1 className="hub-title" style={styles.title}>
-          DONAAM.APP DOMAIN HUB
+          DRAG RACE FASHION REVIEW
         </h1>
 
         <div className="hub-auth-area" style={styles.authArea}>
@@ -57,16 +58,37 @@ export default function DonaamHome() {
             ))}
         </div>
 
-        <section style={styles.projects}>
-          <h2 style={styles.sectionHeading}>Projects</h2>
-
-          <Link href={dragRaceHomeRoute()} style={styles.projectLink}>
-            Drag Race Fashion Review
+        <div style={styles.hubArea}>
+          <Link href="/" style={styles.button}>
+            Return to domain hub
           </Link>
+        </div>
+
+        <section style={styles.seasons}>
+          <h2 style={styles.sectionHeading}>Seasons</h2>
+
+          {seasons.length === 0 ? (
+            <p style={styles.empty}>No seasons available yet.</p>
+          ) : (
+            seasons.map((s) => (
+              <Link
+                key={`${s.franchiseSlug}-${s.seasonNumber}`}
+                href={seasonRoute(s.franchiseSlug, s.seasonNumber)}
+                style={styles.seasonLink}
+              >
+                {s.franchiseName} — Season {s.seasonNumber}
+              </Link>
+            ))
+          )}
         </section>
       </main>
     </div>
   );
+}
+
+export async function getServerSideProps() {
+  const seasons = await getAvailableSeasons();
+  return { props: { seasons } };
 }
 
 const styles = {
@@ -97,6 +119,12 @@ const styles = {
     lineHeight: 1,
     fontWeight: 800,
     letterSpacing: "0.04em",
+  },
+
+  hubArea: {
+    marginTop: "24px",
+    display: "flex",
+    justifyContent: "center",
   },
 
   authArea: {
@@ -131,7 +159,7 @@ const styles = {
     fontWeight: 600,
   },
 
-  projects: {
+  seasons: {
     marginTop: "52px",
     display: "flex",
     flexDirection: "column",
@@ -145,7 +173,7 @@ const styles = {
     fontWeight: 700,
   },
 
-  projectLink: {
+  seasonLink: {
     display: "inline-block",
     width: "fit-content",
     padding: "13px 20px",
@@ -156,5 +184,11 @@ const styles = {
     textDecoration: "none",
     fontSize: "20px",
     fontWeight: 600,
+  },
+
+  empty: {
+    margin: 0,
+    fontSize: "20px",
+    opacity: 0.8,
   },
 };

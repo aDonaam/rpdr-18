@@ -13,7 +13,7 @@ export default function AdminLooksPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem('rr_user');
-    if (!saved) return router.push(`${router.basePath}/login`);
+    if (!saved) return router.push(`/login`);
     try {
       const parsed = JSON.parse(saved);
       setUser(parsed.username);
@@ -23,12 +23,12 @@ export default function AdminLooksPage() {
         setErr('Not authorized to access this page.');
       }
     } catch {
-      return router.push(`${router.basePath}/login`);
+      return router.push(`/login`);
     }
   }, []);
 
   useEffect(() => {
-    fetch(`${router.basePath}/api/looks`).then((r) => r.json()).then((d) => {
+    fetch(`/api/looks`).then((r) => r.json()).then((d) => {
       setLooks(d.looks || []);
       setLoading(false);
     }).catch((e) => { setErr('Failed to fetch looks'); setLoading(false); });
@@ -45,7 +45,7 @@ export default function AdminLooksPage() {
 
     const payload = { id, title, admin_username: user, admin_pin: pin };
     try {
-      const res = await fetch(`${router.basePath}/api/looks`, {
+      const res = await fetch(`/api/looks`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const data = await res.json();

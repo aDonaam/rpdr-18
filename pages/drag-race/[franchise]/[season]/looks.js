@@ -1,17 +1,42 @@
+/**
+ * pages/drag-race/[franchise]/[season]/looks.js
+ *
+ * Canonical All Looks page for any franchise/season within the Drag Race project.
+ *
+ * Dynamic route parameters:
+ * - [franchise]: franchise slug (e.g. "us", "uk", "es-all-stars")
+ * - [season]: season number (e.g. 18, 5, 1)
+ *
+ * Example URLs:
+ * - /drag-race/us/18/looks
+ * - /drag-race/uk/3/looks
+ * - /drag-race/es-all-stars/1/looks
+ *
+ * Reuses the same LooksPage component and data-loading logic as pages/looks.js,
+ * but obtains franchise/season from URL parameters instead of hardcoding.
+ *
+ * No hardcoded franchise or season; all resolved dynamically.
+ */
+
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
-import LookCard from "../components/LookCard";
-import { supabase } from "../lib/supabaseClient";
-import { supabaseAdmin } from "../lib/supabaseAdmin";
+import LookCard from "../../../../components/LookCard";
+import { supabase } from "../../../../lib/supabaseClient";
+import { getLooksPageData } from "../../../../lib/looksPageData";
+import { getSeasonNavContext } from "../../../../lib/seasonNavData";
 
-export default function LooksPage({ initialLooks = [], initialPublicApproval = null, initialUserApproval = null }) {
-    const router = useRouter();
+/**
+ * Reusable LooksPage component (shared with pages/looks.js).
+ * Displays all looks for a season with chronological/approval sorting and voting.
+ */
+function LooksPage({ initialLooks = [], initialPublicApproval = null, initialUserApproval = null, categorySequenceMap = {}, franchiseSlug = "", seasonNumber = null }) {
+  const router = useRouter();
   const [user, setUser] = useState(null);
-  const [userInitialized, setUserInitialized] = useState(false); // Track if user hydration is complete
-  const [votes, setVotes] = useState({}); // { [look_id]: "TOOT" | "BOOT" }
-  const [looks, setLooks] = useState(initialLooks); // [{...look, overallApproval, overallVoteCount}]
+  const [userInitialized, setUserInitialized] = useState(false);
+  const [votes, setVotes] = useState({});
+  const [looks, setLooks] = useState(initialLooks);
   const [isMobile, setIsMobile] = useState(false);
-  const [sortOption, setSortOption] = useState("chronological"); // "chronological" or "approval"
+  const [sortOption, setSortOption] = useState("chronological");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [publicApproval, setPublicApproval] = useState(initialPublicApproval);
   const [publicVoteCount, setPublicVoteCount] = useState(0);
@@ -29,7 +54,6 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Close sort menu on outside click
   useEffect(() => {
     if (!sortMenuOpen) return;
 
@@ -51,7 +75,6 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
 
   const mobileApprovalHeaderStyle = { gap: "16px", flexDirection: "column" };
 
-  // Calculate overall approval stats
   useEffect(() => {
     if (looks.length === 0) {
       setPublicApproval(null);
@@ -59,7 +82,6 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
       return;
     }
 
-    // Calculate public approval for all looks
     let publicToots = 0, publicTotal = 0;
     looks.forEach((look) => {
       if (look.overallApproval !== null) {
@@ -72,7 +94,6 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
     setPublicApproval(publicApprovalPct);
     setPublicVoteCount(publicTotal);
 
-    // Calculate user approval for all looks
     let userToots = 0, userTotal = 0;
     looks.forEach((look) => {
       if (votes[look.id] === "TOOT") userToots += 1;
@@ -83,31 +104,43 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
     setUserVoteCount(userTotal);
   }, [looks, votes]);
 
-  // Sort looks based on current sort option
   function getSortedLooks() {
     const looksCopy = [...looks];
-    
+
     if (sortOption === "approval") {
-      // Sort by highest approval first, then by vote count, then chronologically for ties
       looksCopy.sort((a, b) => {
         const approvalDiff = (b.overallApproval || 0) - (a.overallApproval || 0);
         if (approvalDiff !== 0) return approvalDiff;
         const voteCountDiff = (b.overallVoteCount || 0) - (a.overallVoteCount || 0);
         if (voteCountDiff !== 0) return voteCountDiff;
-        return a.sequence - b.sequence;
+        const catSeqA = categorySequenceMap[a.category_id] || 999;
+        const catSeqB = categorySequenceMap[b.category_id] || 999;
+        if (catSeqA !== catSeqB) return catSeqA - catSeqB;
+        const lookSeqA = a.sequence !== null ? a.sequence : 999;
+        const lookSeqB = b.sequence !== null ? b.sequence : 999;
+        if (lookSeqA !== 999 || lookSeqB !== 999) {
+          if (lookSeqA !== lookSeqB) return lookSeqA - lookSeqB;
+        }
+        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
       });
     } else {
-      // Chronological: already sorted by sequence, then name
       looksCopy.sort((a, b) => {
-        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+        const catSeqA = categorySequenceMap[a.category_id] || 999;
+        const catSeqB = categorySequenceMap[b.category_id] || 999;
+        if (catSeqA !== catSeqB) return catSeqA - catSeqB;
+
+        const lookSeqA = a.sequence !== null ? a.sequence : 999;
+        const lookSeqB = b.sequence !== null ? b.sequence : 999;
+        if (lookSeqA !== 999 || lookSeqB !== 999) {
+          if (lookSeqA !== lookSeqB) return lookSeqA - lookSeqB;
+        }
         return (a.contestant_name || "").localeCompare(b.contestant_name || "");
       });
     }
-    
+
     return looksCopy;
   }
 
-  // Initialize user from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedUser = window.localStorage.getItem("rr_user");
@@ -122,14 +155,10 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
     setUserInitialized(true);
   }, []);
 
-  // Fetch looks and global vote stats from Supabase (independent of user)
-  // Data is pre-fetched on the server, so we don't need to fetch here
   useEffect(() => {
-    // Update looks state if initialLooks changes (e.g., during route changes)
     setLooks(initialLooks);
   }, [initialLooks]);
 
-  // Fetch user's votes when user is initialized
   useEffect(() => {
     async function fetchUserVotes() {
       if (!userInitialized) return;
@@ -153,10 +182,8 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
   async function handleVote(lookUuid, value) {
     if (!user) { router.push("/login"); return; }
 
-    // Update local state
     setVotes((prev) => ({ ...prev, [lookUuid]: value }));
-    // Persist to Supabase
-    await fetch(`${router.basePath}/api/vote`, {
+    await fetch(`/api/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -166,7 +193,6 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
       }),
     });
 
-    // Fetch latest approval and vote count for this look directly from Supabase for immediate update
     try {
       const { data: votes, error } = await supabase
         .from("votes")
@@ -190,16 +216,16 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
     }
   }
 
-
   const mobileContentStyle = { paddingTop: "0px", paddingLeft: "10px", paddingRight: "10px", paddingBottom: "32px" };
   const mobileHeaderStyle = { paddingTop: "0px", marginBottom: "2px" };
+
+  const titleText = seasonNumber ? `Season ${seasonNumber} - Full Catalog` : "Looks";
 
   return (
     <div style={styles.page}>
       <div style={mergeStyles(styles.content, mobileContentStyle)}>
         <header style={mergeStyles(styles.header, mobileHeaderStyle)}>
-          <h1 style={styles.title}>Season 18 - Full Catalog
-          </h1>
+          <h1 style={styles.title}>{titleText}</h1>
         </header>
         <div style={mergeStyles(styles.approvalHeaderContainer, isMobile ? mobileApprovalHeaderStyle : {})}>
           <div style={mergeStyles(styles.queenStatCol, isMobile ? styles.queenStatColMobile : {})}>
@@ -213,7 +239,7 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
             <div style={styles.statRank}>({userVoteCount} {userVoteCount === 1 ? "vote" : "votes"})</div>
           </div>
         </div>
-        <p style={styles.subtitle}>All runway looks from Season 18</p>
+        <p style={styles.subtitle}>{looks.length} looks from {seasonNumber ? `Season ${seasonNumber}` : "this season"}</p>
         <div style={styles.sorterContainer}>
           <button
             type="button"
@@ -259,6 +285,8 @@ export default function LooksPage({ initialLooks = [], initialPublicApproval = n
               look={look}
               userVote={votes[look.id] || null}
               onVote={(ignoredLookId, voteValue) => handleVote(look.id, voteValue)}
+              franchiseSlug={franchiseSlug}
+              seasonNumber={seasonNumber}
             />
           ))}
         </div>
@@ -273,11 +301,9 @@ const styles = {
     background: "#120902",
     color: "#feefd0",
   },
-
   content: {
-    padding: "0 24px 32px 24px", // left/right + bottom padding
+    padding: "0 24px 32px 24px",
   },
-
   header: {
     margin: "0 0 0 0",
     padding: "12px 0 0 0",
@@ -294,16 +320,6 @@ const styles = {
     textAlign: "center",
     lineHeight: "1.2",
   },
-  userBox: {
-    fontSize: "14px",
-    opacity: 0.9,
-  },
-  link: {
-    color: "#feefd0",
-    textDecoration: "underline",
-    cursor: "pointer",
-  },
-
   subtitle: {
     fontSize: "16px",
     fontWeight: 300,
@@ -320,85 +336,6 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: "16px",
-  },
-  card: {
-    background: "rgba(255, 255, 255, 0.04)",
-    borderRadius: "16px",
-    padding: "12px 14px",
-    border: "1px solid rgba(255, 255, 255, 0.07)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "14px",
-  },
-  cardTitleLink: {
-    color: "#feefd0",
-    textDecoration: "none",
-  },
-  pillLink: {
-    textDecoration: "none",
-    color: "#f9f5ff",
-  },
-  pill: {
-    fontSize: "13px",
-    fontWeight: 400,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    padding: "3px 8px",
-    borderRadius: "999px",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "1px solid rgba(255, 180, 150, 0.7)",
-    color: "#feefd0",
-  },
-  imageLink: {
-    fontSize: "13px",
-    textDecoration: "underline",
-    color: "#feefd0",
-  },
-  cardFooter: {
-    marginTop: "4px",
-    fontSize: "11px",
-    opacity: 0.7,
-  },
-  voteRow: {
-    marginTop: "10px",
-    display: "flex",
-    gap: "8px",
-  },
-  voteButton: {
-    flex: 1,
-    borderRadius: "999px",
-    padding: "6px 0",
-    fontSize: "13px",
-    fontWeight: 400,
-    letterSpacing: "0.04em",
-    border: "1px solid rgba(255, 255, 255, 0.35)",
-    background: "rgba(0, 0, 0, 0.35)",
-    color: "#f9f5ff",
-    cursor: "pointer",
-  },
-  voteButtonActiveToot: {
-    background: "rgba(120, 237, 173, 0.9)",
-    borderColor: "rgba(120, 237, 173, 1)",
-    color: "#052417",
-    fontWeight: 600,
-  },
-  voteButtonActiveBoot: {
-    background: "rgba(255, 154, 162, 0.9)",
-    borderColor: "rgba(255, 154, 162, 1)",
-    color: "#3a0610",
-    fontWeight: 600,
-  },
-  voteNote: {
-    marginTop: "4px",
-    fontSize: "12px",
-    opacity: 0.9,
   },
   approvalHeaderContainer: {
     display: "flex",
@@ -511,71 +448,45 @@ const styles = {
   },
 };
 
-export async function getServerSideProps() {
-  // Fetch all looks, including sequence
-  const { data: looksData, error: looksError } = await supabaseAdmin
-    .from("looks")
-    .select("id, display_name, contestant_name, category, sequence, image_url")
-    .order("sequence", { ascending: true });
+export default LooksPage;
 
-  if (looksError || !looksData) {
+/**
+ * Server-side data loading for canonical route.
+ * Reads franchise and season from URL params.
+ */
+export async function getServerSideProps({ params }) {
+  const { franchise, season } = params;
+
+  // Validate season parameter: must be exactly a positive integer (no leading zeros, no decimals, no extra chars)
+  if (!/^[1-9]\d*$/.test(season)) {
+    // Invalid season format
     return {
-      props: {
-        initialLooks: [],
-        initialPublicApproval: null,
-        initialUserApproval: null,
-      },
+      notFound: true,
     };
   }
 
-  // Fetch all votes for all looks
-  const lookIds = looksData.map(l => l.id);
-  const { data: allVotesData } = await supabaseAdmin
-    .from("votes")
-    .select("look_uuid, vote")
-    .in("look_uuid", lookIds);
+  const seasonNumber = parseInt(season, 10);
 
-  // Calculate approval % and vote count for each look
-  const lookStats = {};
-  (allVotesData || []).forEach((row) => {
-    if (!lookStats[row.look_uuid]) lookStats[row.look_uuid] = { toot: 0, total: 0 };
-    if (row.vote === "TOOT") lookStats[row.look_uuid].toot += 1;
-    lookStats[row.look_uuid].total += 1;
-  });
+  // Load data using shared utility
+  const [pageData, seasonNav] = await Promise.all([
+    getLooksPageData(franchise, seasonNumber),
+    getSeasonNavContext(franchise, seasonNumber),
+  ]);
 
-  // Attach stats to looks
-  let looksWithStats = (looksData || []).map((look) => {
-    const stats = lookStats[look.id] || { toot: 0, total: 0 };
+  if (!pageData) {
+    // Franchise/season combination not found or error loading data
     return {
-      ...look,
-      look_id: look.look_id || look.id,
-      overallApproval: stats.total > 0 ? Math.round((stats.toot / stats.total) * 100) : null,
-      overallVoteCount: stats.total,
+      notFound: true,
     };
-  });
+  }
 
-  // Sort by sequence ascending, then queen alphabetically for ties
-  looksWithStats.sort((a, b) => {
-    if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-    return (a.contestant_name || "").localeCompare(b.contestant_name || "");
-  });
-
-  // Calculate public approval for all looks
-  let publicToots = 0, publicTotal = 0;
-  looksWithStats.forEach((look) => {
-    if (look.overallApproval !== null) {
-      const tootCount = Math.round((look.overallApproval / 100) * look.overallVoteCount);
-      publicToots += tootCount;
-      publicTotal += look.overallVoteCount;
-    }
-  });
-  const publicApprovalPct = publicTotal > 0 ? (publicToots / publicTotal) * 100 : null;
-
+  // Return props with franchise/season info for title
   return {
     props: {
-      initialLooks: looksWithStats,
-      initialPublicApproval: publicApprovalPct,
-      initialUserApproval: null,
+      ...pageData,
+      franchiseSlug: franchise,
+      seasonNumber: seasonNumber,
+      seasonNav,
     },
   };
 }
