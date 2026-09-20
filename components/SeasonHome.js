@@ -13,16 +13,13 @@
 import React from "react";
 import { useRouter } from "next/router";
 import { seasonQueenRoute, seasonCategoryRoute, seasonUserRoute } from "../lib/routeHelpers";
+import { getQueenImagePath } from "../lib/queenImagePath";
 
 function slugify(str) {
   return (str || "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function queenThumbSrc(contestant_name, basePath = "") {
-  return `${basePath}/thumbnails/queens/${slugify(contestant_name)}.png`;
 }
 
 export default function SeasonHome({ initialLooks, initialCategories, initialUsers, seasonTitle, franchiseSlug, seasonNumber }) {
@@ -132,7 +129,7 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                       <td style={mergeStyles(styles.imageCol, mobileTableStyles.imageCol)}>
                         {q.image_path ? (
                           <img
-                            src={queenThumbSrc(q.contestant_name, "")}
+                            src={getQueenImagePath(q.image_path, q.slug, "")}
                             alt={`${q.display_name || q.contestant_name} thumbnail`}
                             style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
                             onError={(e) => {
@@ -301,16 +298,21 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                         )}
                       </td>
                       <td style={mergeStyles(styles.biasCol, mobileTableStyles.biasCol)}>
-                        {user.favorite_queen ? (
-                          <img
-                            src={queenThumbSrc(user.favorite_queen, "")}
-                            alt={`${user.favorite_queen} thumbnail`}
-                            style={mergeStyles(styles.userBiasThumb, mobileTableStyles.userBiasThumb)}
-                            onError={(e) => {
-                              e.currentTarget.src = `/thumbnails/queens/_default.jpg`;
-                            }}
-                          />
-                        ) : (
+                        {user.favorite_queen ? (() => {
+                          const favoriteQueenData = initialLooks.find((q) => q.slug === user.favorite_queen);
+                          const imagePath = favoriteQueenData?.image_path || null;
+                          const queenSlug = favoriteQueenData?.slug || user.favorite_queen;
+                          return (
+                            <img
+                              src={getQueenImagePath(imagePath, queenSlug, "")}
+                              alt={`${favoriteQueenData?.display_name || user.favorite_queen} thumbnail`}
+                              style={mergeStyles(styles.userBiasThumb, mobileTableStyles.userBiasThumb)}
+                              onError={(e) => {
+                                e.currentTarget.src = `/thumbnails/queens/_default.jpg`;
+                              }}
+                            />
+                          );
+                        })() : (
                           <div style={mergeStyles(styles.avatarPlaceholder, mobileTableStyles.avatarPlaceholder)}>No fave</div>
                         )}
                       </td>

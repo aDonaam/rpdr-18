@@ -11,11 +11,7 @@
 import React from "react";
 import { useRouter } from "next/router";
 import { seasonQueenRoute, seasonCategoryRoute } from "../lib/routeHelpers";
-
-// Thumbnails are keyed by canonical queen slug (queens.slug), not the display name.
-function queenThumbSrc(slug, basePath = "") {
-  return `${basePath}/thumbnails/queens/${slug}.png`;
-}
+import { getQueenImagePath } from "../lib/queenImagePath";
 
 export default function UserPage({ username, displayUsername, rows, categories, franchiseSlug, seasonNumber }) {
   const router = useRouter();
@@ -119,7 +115,7 @@ export default function UserPage({ username, displayUsername, rows, categories, 
                       <td style={mergeStyles(styles.imageCol, mobileTableStyles.imageCol)}>
                         {q.image_path ? (
                           <img
-                            src={queenThumbSrc(q.slug, "")}
+                            src={getQueenImagePath(q.image_path, q.slug, "")}
                             alt={`${q.contestant_name} thumbnail`}
                             style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
                             onError={(e) => {

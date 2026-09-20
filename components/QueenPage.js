@@ -13,15 +13,13 @@ import { useRouter } from "next/router";
 import LookCard from "./LookCard";
 import { supabase } from "../lib/supabaseClient";
 import { seasonCategoryRoute } from "../lib/routeHelpers";
+import { getQueenImagePath } from "../lib/queenImagePath";
 
-function getQueenPortraitUrl(queenSlug) {
-  return `/thumbnails/queens/${queenSlug}.png`;
-}
-
-export default function QueenPage({ initialLooks, queenName: initialQueenName, queenSlug: initialQueenSlug, initialPublicRank, allLooksData: initialAllLooksData, allVotesData: initialAllVotesData, categorySequenceMap = {}, franchiseSlug, seasonNumber }) {
+export default function QueenPage({ initialLooks, queenName: initialQueenName, queenSlug: initialQueenSlug, queenImagePath: initialQueenImagePath, initialPublicRank, allLooksData: initialAllLooksData, allVotesData: initialAllVotesData, categorySequenceMap = {}, franchiseSlug, seasonNumber }) {
   const router = useRouter();
   const [queenName, setQueenName] = useState(initialQueenName);
   const [queenSlug, setQueenSlug] = useState(initialQueenSlug);
+  const [queenImagePath, setQueenImagePath] = useState(initialQueenImagePath);
   const [user, setUser] = useState(null);
   const [userInitialized, setUserInitialized] = useState(false);
   const [votes, setVotes] = useState({});
@@ -381,7 +379,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
           <div style={mergeStyles(styles.queenHeaderContainer, isMobile ? styles.queenHeaderContainerMobile : {})}>
             <div style={mergeStyles(styles.queenPortraitCol, isMobile ? styles.queenPortraitColMobile : {})}>
               <img
-                src={getQueenPortraitUrl(queenSlug)}
+                src={getQueenImagePath(queenImagePath, queenSlug, "")}
                 alt={`${queenName} portrait`}
                 style={{
                   ...styles.portrait,
