@@ -17,9 +17,40 @@ export default function Layout({ children, seasonNav }) {
   // The season navbar is a season-site component: it only renders when a page
   // explicitly supplies seasonNav (i.e. it lives within a resolved season site).
   const showNavBar = !!seasonNav;
+  const theme = seasonNav?.theme || null;
+
+  // Season theme values become CSS custom properties on the season-scoped
+  // wrapper only; neutral (non-season) pages never receive them, and a future
+  // nested appearance wrapper can still override these same variable names.
+  const themeVars = theme
+    ? {
+        "--theme-page-background": theme.pageBackground,
+        "--theme-ground-text-primary": theme.groundTextPrimary,
+        "--theme-ground-text-secondary": theme.groundTextSecondary,
+        "--theme-element-fill": theme.elementFill,
+        "--theme-element-text-primary": theme.elementTextPrimary,
+        "--theme-element-text-secondary": theme.elementTextSecondary,
+        "--theme-stacked-element-fill": theme.stackedElementFill,
+        "--theme-stacked-element-text": theme.stackedElementText,
+        "--theme-element-border": theme.elementBorder,
+        "--theme-active-toot-fill": theme.activeTootFill,
+        "--theme-active-toot-text": theme.activeTootText,
+        "--theme-active-boot-fill": theme.activeBootFill,
+        "--theme-active-boot-text": theme.activeBootText,
+      }
+    : null;
+
+  const pageStyle = themeVars
+    ? {
+        ...styles.page,
+        ...themeVars,
+        background: "var(--theme-page-background)",
+        color: "var(--theme-ground-text-primary)",
+      }
+    : styles.pageNeutral;
 
   return (
-    <div style={styles.page}>
+    <div style={pageStyle}>
       {showNavBar && <NavBar seasonNav={seasonNav} />}
       <main style={showNavBar ? (isMobile ? { ...styles.main, ...styles.mainMobile } : styles.main) : styles.mainNoNav}>
         {children}
@@ -40,8 +71,14 @@ const styles = {
     minHeight: "100vh",
     width: "100%",
     margin: 0,
-    background: "#120902",
-    color: "#feefd0",
+    overflowX: "hidden",
+  },
+  // Non-season pages (donaam.app root, /drag-race project pages, login/admin)
+  // supply their own backgrounds; the shared wrapper stays neutral for them.
+  pageNeutral: {
+    minHeight: "100vh",
+    width: "100%",
+    margin: 0,
     overflowX: "hidden",
   },
   main: {

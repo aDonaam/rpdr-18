@@ -28,16 +28,16 @@ body {
   padding: 0;
   background-color: #0c0c0c;
   /* off black */
-  color: #feefd0;
-  /* light gold text */
+  color: #e7e7e7;
+  /* neutral default text; season pages set their own via --theme-ground-text-primary */
   overflow-x: hidden;
 }
 
 /* Next.js root */
 #__next {
   min-height: 100vh;
-  background-color: #120902;
-  /* ensure root matches */
+  background-color: #0c0c0c;
+  /* neutral platform background; season pages set their own via --theme-page-background */
 }
 
 /* Base text styling */
@@ -86,9 +86,9 @@ a:visited {
   text-decoration: none;
 }
 
-/* Inside look cards, keep link text light gold, no underline */
+/* Inside look cards, keep link text on the season's element text color, no underline */
 .look-card a {
-  color: #feefd0 !important;
+  color: var(--theme-element-text-primary) !important;
   text-decoration: none !important;
 }
 

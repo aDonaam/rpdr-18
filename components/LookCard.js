@@ -4,14 +4,7 @@ import { useRouter } from "next/router";
 import { useState, useMemo, useEffect } from "react";
 import { seasonQueenRoute, seasonCategoryRoute } from "../lib/routeHelpers";
 
-function slugify(str) {
-  return (str || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-export default function LookCard({ look, userVote = null, onVote, headerMode = "home", onCategoryClick, disableQueenLink, franchiseSlug, seasonNumber }) {
+export default function LookCard({ look, userVote = null, onVote, headerMode = "home", franchiseSlug, seasonNumber }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const hasImageUrl = typeof look.image_path === "string" && look.image_path.trim().length > 0;
@@ -26,13 +19,13 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
   if (
     !look ||
     typeof look !== "object" ||
-    typeof look.contestant_name !== "string" ||
-    typeof look.category !== "string" ||
+    typeof look.appearanceDisplayName !== "string" ||
+    typeof look.categoryDisplayName !== "string" ||
     typeof look.id !== "string" // ✅ require UUID always
   ) {
     console.error("[LookCard] Invalid look prop on initial render", { look });
     return (
-      <div style={{ background: "#1a0f08", color: "#fff", padding: 16, borderRadius: 8 }}>
+      <div style={{ background: "var(--theme-page-background)", color: "var(--theme-ground-text-primary)", padding: 16, borderRadius: 8 }}>
         <b>Invalid Look Data</b>
         <pre style={{ fontSize: 12, marginTop: 8 }}>{JSON.stringify(look, null, 2)}</pre>
       </div>
@@ -58,11 +51,9 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
   const [saving, setSaving] = useState(false);
 
   // All active callers (QueenPage, CategoryPage, canonical All Looks) supply
-  // season context; canonical slugs are preferred over re-derived legacy slugs.
-  const queenSlug = look.contestant_slug || slugify(look.contestant_name);
-  const categorySlugValue = look.categorySlug || look.category_slug || slugify(look.category);
-  const queenHref = seasonQueenRoute(franchiseSlug, seasonNumber, queenSlug);
-  const categoryHref = seasonCategoryRoute(franchiseSlug, seasonNumber, categorySlugValue);
+  // season context and normalized slugs from the loaders.
+  const queenHref = seasonQueenRoute(franchiseSlug, seasonNumber, look.queenSlug);
+  const categoryHref = seasonCategoryRoute(franchiseSlug, seasonNumber, look.categorySlug);
 
   const goToQueen = () => {
     router.push(queenHref);
@@ -126,10 +117,10 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
             style={{ ...styles.queenName, cursor: "pointer" }}
             onClick={goToQueen}
           >
-            {look.display_name || look.contestant_name}
+            {look.appearanceDisplayName || look.display_name}
           </span>
         ) : (
-          <span style={styles.queenName}>{look.display_name || look.contestant_name}</span>
+          <span style={styles.queenName}>{look.appearanceDisplayName || look.display_name}</span>
         )}
       </div>
 
@@ -140,10 +131,10 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
             href={categoryHref}
             style={styles.pillLink}
           >
-            <span style={styles.pill}>{look.category}</span>
+            <span style={styles.pill}>{look.categoryDisplayName}</span>
           </Link>
         ) : (
-          <span style={styles.pill}>{look.category}</span>
+          <span style={styles.pill}>{look.categoryDisplayName}</span>
         )}
       </div>
     </div>
@@ -162,7 +153,7 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
         >
           <img
             src={look.image_path}
-            alt={`${look.display_name || look.contestant_name} – ${look.category}`}
+            alt={`${look.appearanceDisplayName || look.display_name} – ${look.categoryDisplayName}`}
             style={styles.image}
             onError={() => setImgFailed(true)}
           />
@@ -205,9 +196,9 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
 
       <div suppressHydrationWarning style={styles.voteNote}>
         {userVote === "TOOT"
-          ? "You tooted this look."
+          ? "You reviewed this look positively."
           : userVote === "BOOT"
-            ? "You booted this look."
+            ? "You reviewed this look negatively."
             : "You have not reviewed this look."}
       </div>
 
@@ -221,10 +212,10 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
 
 const styles = {
   card: {
-    background: "rgba(255, 195, 205, 0.12)",      // subtle warm glow
+    background: "var(--theme-element-fill)",
     borderRadius: "16px",
     padding: "12px 14px",
-    border: "2px solid rgba(255, 180, 150, 0.35)", // warm gold border
+    border: "2px solid var(--theme-element-border)",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
@@ -257,9 +248,9 @@ const styles = {
     letterSpacing: "0.08em",
     padding: "4px 12px",
     borderRadius: "999px",
-    background: "rgba(255, 180, 150, 0.16)",       // soft rose gold
-    border: "1px solid rgba(255, 180, 150, 0.7)",
-    color: "#feefd0",                               // light gold text
+    background: "var(--theme-stacked-element-fill)",
+    border: "1px solid var(--theme-element-border)",
+    color: "var(--theme-stacked-element-text)",
     textAlign: "center",
     fontStyle: "italic",
     lineHeight: 1.2,
@@ -274,12 +265,12 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    border: "2px solid rgba(255, 180, 150, 0.35)", // warm gold border
+    border: "2px solid var(--theme-element-border)",
     width: "100%",
     maxWidth: "275px",
     aspectRatio: "764 / 1079",
     /* height removed to let aspectRatio control height */
-    background: "#1a0f08",
+    background: "var(--theme-stacked-element-fill)",
   },
 
   image: {
@@ -287,7 +278,7 @@ const styles = {
     width: "100%",
     aspectRatio: "764 / 1079",
     objectFit: "cover",
-    background: "#1a0f08",
+    background: "var(--theme-stacked-element-fill)",
   },
   queenName: {
     textTransform: "uppercase",
@@ -296,7 +287,7 @@ const styles = {
     fontSize: "19px",
     display: "block",
     textAlign: "center",
-    color: "#feefd0", // light gold
+    color: "var(--theme-element-text-primary)",
   },
 
   voteRow: {
@@ -314,22 +305,22 @@ const styles = {
     fontSize: "15px",
     fontWeight: 400,
     letterSpacing: "0.04em",
-    border: "1px solid rgba(255, 204, 128, 0.45)", // warm border
-    background: "rgba(0, 0, 0, 0.35)",
-    color: "#feefd0",
+    border: "1px solid var(--theme-element-border)",
+    background: "var(--theme-page-background)",
+    color: "var(--theme-ground-text-primary)",
     cursor: "pointer",
     fontFamily: "inherit",
   },
   voteButtonActiveToot: {
-    background: "rgba(232, 202, 122, 0.95)",        // warm yellow
-    borderColor: "rgba(232, 202, 122, 1)",
-    color: "#241b05f1",
+    background: "var(--theme-active-toot-fill)",
+    borderColor: "var(--theme-element-border)",
+    color: "var(--theme-active-toot-text)",
     fontWeight: 500,
   },
   voteButtonActiveBoot: {
-    background: "rgba(232, 142, 122, 0.95)",        // warm coral
-    borderColor: "rgba(232, 142, 122, 1)",
-    color: "#3a120bf1",
+    background: "var(--theme-active-boot-fill)",
+    borderColor: "var(--theme-element-border)",
+    color: "var(--theme-active-boot-text)",
     fontWeight: 500,
   },
 
@@ -340,13 +331,13 @@ const styles = {
     letterSpacing: "0.06em",
     textAlign: "center",
     fontStyle: "italic",
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
   },
   publicNote: {
     fontSize: "12px",
     fontWeight: 300,
     letterSpacing: "0.06em",
-    color: "#facbb8",         // light gold
+    color: "var(--theme-element-text-secondary)",
     textAlign: "center",
   },
 
@@ -361,13 +352,13 @@ const styles = {
     width: "100%",
     maxWidth: "275px",
     aspectRatio: "764 / 1079",
-    background: "#1a0f08",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "var(--theme-page-background)",
+    border: "2px solid var(--theme-element-border)",
     fontSize: "20px",
     fontWeight: 500,
     letterSpacing: "0.04em",
     textTransform: "uppercase",
-    color: "#feefd0",
+    color: "var(--theme-ground-text-primary)",
   }
 
 };

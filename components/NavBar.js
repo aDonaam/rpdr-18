@@ -10,11 +10,6 @@ import {
   seasonUserRoute,
 } from "../lib/routeHelpers";
 
-// Season 18 is the only season with a configured logo asset today; other
-// seasons render without a logo until the season display/theme system exists.
-const SEASON_LOGOS = {
-  18: { src: "/brand/s18-logo.png", alt: "Season 18" },
-};
 const DEFAULT_SEASON_NUMBER = 18;
 
 export default function NavBar({ seasonNav }) {
@@ -31,7 +26,9 @@ export default function NavBar({ seasonNav }) {
   const seasonNumber = seasonNav?.seasonNumber ?? DEFAULT_SEASON_NUMBER;
   const queens = seasonNav?.queens || [];
   const categories = seasonNav?.categories || [];
-  const logo = SEASON_LOGOS[seasonNumber] || null;
+  const logo = franchiseSlug
+    ? { src: `/drag-race/${franchiseSlug}/${seasonNumber}/logo.png`, alt: `Season ${seasonNumber}` }
+    : null;
 
   // Canonical destinations require a resolved franchise/season; pages that
   // don't supply seasonNav (e.g. login/admin) fall back to legacy routes.
@@ -238,11 +235,11 @@ const styles = {
     left: "24px",
     right: "24px",
     zIndex: 1001,
-    background: "#2e1f1a",
-    borderTop: "2px solid rgba(255, 180, 150, 0.35)",
-    borderLeft: "2px solid rgba(255, 180, 150, 0.35)",
-    borderRight: "2px solid rgba(255, 180, 150, 0.35)",
-    borderBottom: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "var(--theme-element-fill)",
+    borderTop: "2px solid var(--theme-element-border)",
+    borderLeft: "2px solid var(--theme-element-border)",
+    borderRight: "2px solid var(--theme-element-border)",
+    borderBottom: "2px solid var(--theme-element-border)",
     borderRadius: "16px",
     padding: 0,
     height: "70px",
@@ -257,11 +254,11 @@ const styles = {
     left: "10px",
     right: "10px",
     zIndex: 1001,
-    background: "#2e1f1a",
-    borderTop: "2px solid rgba(255, 180, 150, 0.35)",
-    borderLeft: "2px solid rgba(255, 180, 150, 0.35)",
-    borderRight: "2px solid rgba(255, 180, 150, 0.35)",
-    borderBottom: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "var(--theme-element-fill)",
+    borderTop: "2px solid var(--theme-element-border)",
+    borderLeft: "2px solid var(--theme-element-border)",
+    borderRight: "2px solid var(--theme-element-border)",
+    borderBottom: "2px solid var(--theme-element-border)",
     borderRadius: "16px",
     padding: 0,
     minHeight: "auto",
@@ -340,7 +337,7 @@ const styles = {
   seasonLabel: {
     fontSize: "12px",
     fontWeight: 600,
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     letterSpacing: "0.04em",
     textTransform: "uppercase",
   },
@@ -348,7 +345,7 @@ const styles = {
   seasonLabelMobile: {
     fontSize: "11px",
     fontWeight: 600,
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     letterSpacing: "0.04em",
     textTransform: "uppercase",
   },
@@ -357,7 +354,7 @@ const styles = {
     margin: 0,
     fontSize: "18px",
     fontWeight: 600,
-    color: "#feefd0",                                 // light gold text
+    color: "var(--theme-element-text-primary)",
     whiteSpace: "nowrap",
     lineHeight: 1,
   },
@@ -366,7 +363,7 @@ const styles = {
     margin: 0,
     fontSize: "14px",
     fontWeight: 600,
-    color: "#feefd0",                                 // light gold text
+    color: "var(--theme-element-text-primary)",
     whiteSpace: "nowrap",
     lineHeight: 1,
   },
@@ -395,7 +392,7 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "0.06em",
     padding: "6px 18px",
-    color: "#feefd0",                                 // light gold text
+    color: "var(--theme-element-text-primary)",
     textDecoration: "none",
     cursor: "pointer",
     transition: "all 0.2s ease",
@@ -445,8 +442,8 @@ const styles = {
     top: "calc(100% + 4px)",
     left: 0,
     minWidth: "160px",
-    background: "#0f0804",
-    border: "1px solid rgba(244, 194, 122, 0.2)",
+    background: "var(--theme-page-background)",
+    border: "1px solid var(--theme-element-border)",
     borderRadius: "6px",
     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
     zIndex: 1100,
@@ -461,7 +458,7 @@ const styles = {
   dropdownItem: {
     display: "block",
     padding: "4px 14px",
-    color: "#feefd0",                                 // light gold text
+    color: "var(--theme-ground-text-primary)",
     textDecoration: "none",
     fontSize: "14px",
     fontWeight: 300,
@@ -493,7 +490,7 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "0.04em",
     padding: "6px 14px",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     textDecoration: "none",
     cursor: "pointer",
     transition: "all 0.2s ease",
@@ -504,7 +501,7 @@ const styles = {
     fontSize: "16px",
     fontWeight: 400,
     letterSpacing: "0.04em",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     textDecoration: "none",
     cursor: "pointer",
     transition: "opacity 0.2s ease",
@@ -515,6 +512,7 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "0.06em",
     padding: "6px 18px",
+    color: "var(--theme-element-text-primary)",
     textDecoration: "none",
     cursor: "pointer",
     transition: "all 0.2s ease",
@@ -537,7 +535,7 @@ const styles = {
     left: 0,
     right: 0,
     height: "110px",
-    background: "linear-gradient(to bottom, #120902 0%, #120902 83%, transparent 100%)",
+    background: "linear-gradient(to bottom, var(--theme-page-background) 0%, var(--theme-page-background) 83%, transparent 100%)",
     zIndex: 1000,
     pointerEvents: "none",
   },
@@ -548,7 +546,7 @@ const styles = {
     left: 0,
     right: 0,
     height: "133px",
-    background: "linear-gradient(to bottom, #120902 0%, #120902 90%, transparent 100%)",
+    background: "linear-gradient(to bottom, var(--theme-page-background) 0%, var(--theme-page-background) 90%, transparent 100%)",
     zIndex: 1000,
     pointerEvents: "none",
   },

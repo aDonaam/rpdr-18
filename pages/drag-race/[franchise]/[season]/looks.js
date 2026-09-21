@@ -121,7 +121,7 @@ function LooksPage({ initialLooks = [], initialPublicApproval = null, initialUse
         if (lookSeqA !== 999 || lookSeqB !== 999) {
           if (lookSeqA !== lookSeqB) return lookSeqA - lookSeqB;
         }
-        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
+        return (a.appearanceDisplayName || "").localeCompare(b.appearanceDisplayName || "");
       });
     } else {
       looksCopy.sort((a, b) => {
@@ -134,7 +134,7 @@ function LooksPage({ initialLooks = [], initialPublicApproval = null, initialUse
         if (lookSeqA !== 999 || lookSeqB !== 999) {
           if (lookSeqA !== lookSeqB) return lookSeqA - lookSeqB;
         }
-        return (a.contestant_name || "").localeCompare(b.contestant_name || "");
+        return (a.appearanceDisplayName || "").localeCompare(b.appearanceDisplayName || "");
       });
     }
 
@@ -298,8 +298,8 @@ function LooksPage({ initialLooks = [], initialPublicApproval = null, initialUse
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#120902",
-    color: "#feefd0",
+    background: "var(--theme-page-background)",
+    color: "var(--theme-ground-text-primary)",
   },
   content: {
     padding: "0 24px 32px 24px",
@@ -314,7 +314,7 @@ const styles = {
     fontWeight: 500,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "#feefd0",
+    color: "var(--theme-ground-text-primary)",
     margin: "0 0 20px 0",
     padding: 0,
     textAlign: "center",
@@ -330,7 +330,7 @@ const styles = {
     margin: "0 auto 20px auto",
     padding: "0",
     textAlign: "center",
-    color: "#facbb8",
+    color: "var(--theme-ground-text-secondary)",
   },
   cardGrid: {
     display: "grid",
@@ -350,8 +350,8 @@ const styles = {
     textAlign: "center",
     padding: "12px 16px",
     borderRadius: "12px",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    background: "rgba(255, 195, 205, 0.12)",
+    border: "2px solid var(--theme-element-border)",
+    background: "var(--theme-element-fill)",
     minWidth: "188px",
   },
   queenStatColMobile: {
@@ -362,14 +362,14 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     marginBottom: "6px",
     fontFamily: "Oswald, sans-serif",
   },
   statValue: {
     fontSize: "28px",
     fontWeight: 600,
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
     fontFamily: "Oswald, sans-serif",
     marginBottom: "6px",
   },
@@ -377,7 +377,7 @@ const styles = {
     fontSize: "14px",
     fontWeight: 400,
     letterSpacing: "0.04em",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     fontFamily: "Oswald, sans-serif",
     marginTop: "6px",
   },
@@ -396,9 +396,9 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "0.04em",
     borderRadius: "16px",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    background: "rgba(255, 195, 205, 0.12)",
-    color: "#feefd0",
+    border: "2px solid var(--theme-element-border)",
+    background: "var(--theme-element-fill)",
+    color: "var(--theme-element-text-primary)",
     cursor: "pointer",
     fontFamily: "Oswald, sans-serif",
     outline: "none",
@@ -422,8 +422,8 @@ const styles = {
     left: "50%",
     transform: "translateX(-50%)",
     width: "240px",
-    background: "#0f0804",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "var(--theme-page-background)",
+    border: "2px solid var(--theme-element-border)",
     borderRadius: "16px",
     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
     zIndex: 1100,
@@ -433,7 +433,7 @@ const styles = {
     display: "block",
     width: "100%",
     padding: "8px 14px",
-    color: "#feefd0",
+    color: "var(--theme-ground-text-primary)",
     background: "transparent",
     border: "none",
     fontSize: "14px",

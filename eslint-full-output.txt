@@ -1,0 +1,100 @@
+﻿
+C:\Users\Andrew\Documents\runway-review-site\components\CategoryPage.js
+   59:5  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  57 |   // between two category pages reuses this component and gets fresh SSR props)
+  58 |   useEffect(() => {
+> 59 |     setLooks(initialLooks);
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  60 |     setCategoryName(initialCategoryName || "");
+  61 |     setCategorySlug(initialCategorySlug || "");
+  62 |     setTotalCategories(initialTotalCategories || 0);  react-hooks/set-state-in-effect
+   66:5  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  64 |
+  65 |   useEffect(() => {
+> 66 |     setPublicRank(initialPublicRank || null);
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  67 |   }, [initialPublicRank]);
+  68 |
+  69 |   useEffect(() => {                                                                                                                                                                 react-hooks/set-state-in-effect
+  265:6  warning  React Hook useEffect has a missing dependency: 'initialPublicRank'. Either include it or remove the dependency array. If 'setPublicRank' needs the current value of 'initialPublicRank', you can also switch to useReducer instead of useState and read 'initialPublicRank' in the reducer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react-hooks/exhaustive-deps
+  274:9  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  272 |       try {
+  273 |         const parsed = JSON.parse(savedUser);
+> 274 |         setUser({ ...parsed, user_id: parsed.userId || parsed.user_id || parsed.id });
+      |         ^^^^^^^ Avoid calling setState() directly within an effect
+  275 |       } catch (err) {
+  276 |         console.error("Failed to parse stored user:", err);
+  277 |       }                                  react-hooks/set-state-in-effect
+
+C:\Users\Andrew\Documents\runway-review-site\components\QueenPage.js
+   49:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  47 |   // Sync publicRank/totalQueens when server props change
+  48 |   useEffect(() => {
+> 49 |     setPublicRank(initialPublicRank || null);
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  50 |     setTotalQueens(initialTotalQueens || 0);
+  51 |   }, [initialPublicRank, initialTotalQueens]);
+  52 |                                                              react-hooks/set-state-in-effect
+  286:6   warning  React Hook useEffect has a missing dependency: 'initialPublicRank'. Either include it or remove the dependency array. If 'setPublicRank' needs the current value of 'initialPublicRank', you can also switch to useReducer instead of useState and read 'initialPublicRank' in the reducer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+  295:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  293 |       try {
+  294 |         const parsed = JSON.parse(savedUser);
+> 295 |         setUser({ ...parsed, user_id: parsed.userId || parsed.user_id || parsed.id });
+      |         ^^^^^^^ Avoid calling setState() directly within an effect
+  296 |       } catch (err) {
+  297 |         console.error("Failed to parse stored user:", err);
+  298 |       }                                      react-hooks/set-state-in-effect
+  306:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  304 |   // navigation between two queen pages reuses this component and gets fresh SSR props)
+  305 |   useEffect(() => {
+> 306 |     setLooks(initialLooks);
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  307 |     setQueenName(initialQueenName || "");
+  308 |     setQueenSlug(initialQueenSlug || "");
+  309 |     setQueenImagePath(initialQueenImagePath || null);  react-hooks/set-state-in-effect
+  390:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @next/next/no-img-element
+
+Γ£û 9 problems (6 errors, 3 warnings)
+

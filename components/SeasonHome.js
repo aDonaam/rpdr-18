@@ -38,7 +38,7 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
   // Mobile table styles
   const mobileTableStyles = {
     rankCol: { width: "28px", paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", fontSize: "14px", verticalAlign: "middle", textAlign: "center", fontWeight: 600 },
-    rankBadge: { display: "inline-block", fontSize: "13px", paddingTop: "4px", paddingRight: "4px", paddingBottom: "4px", paddingLeft: "4px", borderRadius: "8px", background: "rgba(255, 180, 150, 0.16)", border: "2px solid rgba(255, 180, 150, 0.35)", color: "#feefd0", fontWeight: 600, width: "14px", textAlign: "center" },
+    rankBadge: { display: "inline-block", fontSize: "13px", paddingTop: "4px", paddingRight: "4px", paddingBottom: "4px", paddingLeft: "4px", borderRadius: "8px", background: "var(--theme-stacked-element-fill)", border: "2px solid var(--theme-element-border)", color: "var(--theme-stacked-element-text)", fontWeight: 600, width: "14px", textAlign: "center" },
     imageCol: { width: "40px", paddingTop: "7px", paddingRight: "2px", paddingBottom: "5px", paddingLeft: "2px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" },
     nameCol: { paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", width: "auto", verticalAlign: "middle", textAlign: "center" },
     approvalCol: { width: "60px", paddingTop: "6px", paddingRight: "0px", paddingBottom: "6px", paddingLeft: "0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
@@ -130,7 +130,7 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                         {q.image_path ? (
                           <img
                             src={getQueenImagePath(q.image_path, q.slug, "")}
-                            alt={`${q.display_name || q.contestant_name} thumbnail`}
+                            alt={`${q.appearanceDisplayName} thumbnail`}
                             style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
                             onError={(e) => {
                               e.currentTarget.src = `/thumbnails/queens/_default.jpg`;
@@ -145,7 +145,7 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                           style={mergeStyles(styles.nameLink, mobileTableStyles.nameLink)}
                           onClick={() => franchiseSlug && router.push(seasonQueenRoute(franchiseSlug, seasonNumber, q.slug))}
                         >
-                          {q.contestant_name.toUpperCase()}
+                          {q.appearanceDisplayName.toUpperCase()}
                         </span>
                       </td>
                       <td style={mergeStyles(styles.approvalCol, mobileTableStyles.approvalCol)}>
@@ -215,7 +215,7 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                           style={mergeStyles(styles.categoryNameLink, isMobile ? mobileTableStyles.categoryNameLink : {})}
                           onClick={() => franchiseSlug && router.push(seasonCategoryRoute(franchiseSlug, seasonNumber, c.slug))}
                         >
-                          {c.category.toUpperCase()}
+                          {c.categoryDisplayName.toUpperCase()}
                         </span>
                       </td>
                       <td style={mergeStyles(styles.approvalCol, mobileTableStyles.approvalCol)}>
@@ -305,7 +305,7 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                           return (
                             <img
                               src={getQueenImagePath(imagePath, queenSlug, "")}
-                              alt={`${favoriteQueenData?.display_name || user.favorite_queen} thumbnail`}
+                              alt={`${favoriteQueenData?.appearanceDisplayName || user.favorite_queen} thumbnail`}
                               style={mergeStyles(styles.userBiasThumb, mobileTableStyles.userBiasThumb)}
                               onError={(e) => {
                                 e.currentTarget.src = `/thumbnails/queens/_default.jpg`;
@@ -338,8 +338,8 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#120902",
-    color: "#feefd0",
+    background: "var(--theme-page-background)",
+    color: "var(--theme-ground-text-primary)",
     paddingTop: "12px",
     paddingRight: "24px",
     paddingBottom: "24px",
@@ -355,7 +355,7 @@ const styles = {
     fontWeight: 500,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "#feefd0",
+    color: "var(--theme-ground-text-primary)",
     marginBottom: "6px",
     textAlign: "center",
     lineHeight: "1.2",
@@ -369,7 +369,7 @@ const styles = {
     margin: "0 auto 36px auto",
     padding: "12px 0",
     textAlign: "center",
-    color: "#facbb8",
+    color: "var(--theme-ground-text-secondary)",
   },
   empty: {
     fontSize: "14px",
@@ -396,8 +396,8 @@ const styles = {
     marginTop: "16px",
     borderRadius: "16px",
     overflow: "hidden",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    background: "rgba(255, 195, 205, 0.12)",
+    border: "2px solid var(--theme-element-border)",
+    background: "var(--theme-element-fill)",
     margin: "16px auto",
     width: "fit-content",
   },
@@ -416,7 +416,7 @@ const styles = {
     fontWeight: 500,
     textAlign: "center",
     fontSize: "24px",
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
   },
   rankColHeader: {
     width: "40px",
@@ -428,7 +428,7 @@ const styles = {
     textAlign: "center",
     fontSize: "20px",
     fontStyle: "italic",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
   },
   imageCol: {
     width: "80px",
@@ -462,7 +462,7 @@ const styles = {
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
   },
   biasCol: {
     width: "80px",
@@ -501,7 +501,7 @@ const styles = {
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
   },
   userNameColHeader: {
     paddingTop: "10px",
@@ -513,7 +513,7 @@ const styles = {
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
   },
   categoryNameCol: {
     paddingTop: "12px",
@@ -535,7 +535,7 @@ const styles = {
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
   },
   approvalCol: {
     width: "120px",
@@ -555,7 +555,7 @@ const styles = {
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
   },
   votesCol: {
     width: "100px",
@@ -583,7 +583,7 @@ const styles = {
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
   },
   avatar: {
     width: "56px",
@@ -608,7 +608,7 @@ const styles = {
     fontWeight: 500,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
     cursor: "pointer",
     textDecoration: "none",
     display: "inline-block",
@@ -617,7 +617,7 @@ const styles = {
     fontSize: "24px",
     fontWeight: 500,
     letterSpacing: "0.08em",
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
     cursor: "pointer",
     textDecoration: "none",
     display: "inline-block",
@@ -627,7 +627,7 @@ const styles = {
     fontWeight: 500,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
     cursor: "pointer",
     textDecoration: "none",
     display: "inline-block",
@@ -644,9 +644,9 @@ const styles = {
     paddingBottom: "4px",
     paddingLeft: "0px",
     borderRadius: "12px",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    color: "#feefd0",
+    background: "var(--theme-stacked-element-fill)",
+    border: "2px solid var(--theme-element-border)",
+    color: "var(--theme-stacked-element-text)",
     width: "76px",
     textAlign: "center",
   },
@@ -657,9 +657,9 @@ const styles = {
     paddingBottom: "4px",
     paddingLeft: "10px",
     borderRadius: "10px",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    color: "#feefd0",
+    background: "var(--theme-stacked-element-fill)",
+    border: "2px solid var(--theme-element-border)",
+    color: "var(--theme-stacked-element-text)",
     fontSize: "12px",
     fontWeight: 200,
     width: "48px"
@@ -671,9 +671,9 @@ const styles = {
     paddingBottom: "4px",
     paddingLeft: "12px",
     borderRadius: "10px",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    color: "#feefd0",
+    background: "var(--theme-stacked-element-fill)",
+    border: "2px solid var(--theme-element-border)",
+    color: "var(--theme-stacked-element-text)",
     fontSize: "16px",
     fontWeight: 200,
     width: "auto"
@@ -686,9 +686,9 @@ const styles = {
     paddingBottom: "4px",
     paddingLeft: "8px",
     borderRadius: "12px",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    color: "#feefd0",
+    background: "var(--theme-stacked-element-fill)",
+    border: "2px solid var(--theme-element-border)",
+    color: "var(--theme-stacked-element-text)",
     fontWeight: 400,
     width: "20px",
     textAlign: "center",
@@ -705,8 +705,8 @@ const styles = {
     height: 60,
     borderRadius: 12,
     objectFit: "cover",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "2px solid rgba(255, 180, 150, 0.7)",
+    background: "var(--theme-stacked-element-fill)",
+    border: "2px solid var(--theme-element-border)",
     flex: "0 0 auto",
   },
   userBiasThumb: {
@@ -714,15 +714,15 @@ const styles = {
     height: 45,
     borderRadius: 10,
     objectFit: "cover",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "2px solid rgba(255, 180, 150, 0.7)",
+    background: "var(--theme-stacked-element-fill)",
+    border: "2px solid var(--theme-element-border)",
     flex: "0 0 auto",
   },
   userRow: {
     height: "44px",
   },
   headerRow: {
-    borderBottom: "2px solid rgba(255, 180, 150, 0.23)",
+    borderBottom: "2px solid var(--theme-element-border)",
   },
   paddingRow: {
     height: "8px",
@@ -732,7 +732,7 @@ const styles = {
     fontWeight: 500,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "#feefd0",
+    color: "var(--theme-ground-text-primary)",
     marginBottom: "4px",
     textAlign: "center",
     lineHeight: "1.2",
@@ -743,7 +743,7 @@ const styles = {
     letterSpacing: "0.04em",
     fontStyle: "italic",
     textAlign: "center",
-    color: "#facbb8",
+    color: "var(--theme-ground-text-secondary)",
     marginBottom: "12px",
     margin: "0 auto 12px auto",
   },

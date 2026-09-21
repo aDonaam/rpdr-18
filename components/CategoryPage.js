@@ -106,10 +106,10 @@ export default function CategoryPage({
       return look.sequence !== null && look.sequence !== undefined ? look.sequence : 999;
     }
     function appearanceName(look) {
-      return look.appearanceDisplayName || look.display_name || look.contestant_name || "";
+      return look.appearanceDisplayName || look.display_name || "";
     }
     function deterministicFallback(a, b) {
-      return String(a.look_id || a.id).localeCompare(String(b.look_id || b.id));
+      return String(a.id).localeCompare(String(b.id));
     }
 
     if (sortOption === "approval") {
@@ -426,8 +426,8 @@ export default function CategoryPage({
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#120902",
-    color: "#feefd0",
+    background: "var(--theme-page-background)",
+    color: "var(--theme-ground-text-primary)",
   },
 
   content: {
@@ -444,7 +444,7 @@ const styles = {
     fontWeight: 500,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "#feefd0",
+    color: "var(--theme-ground-text-primary)",
     margin: "0 0 20px 0",
     padding: 0,
     textAlign: "center",
@@ -455,7 +455,7 @@ const styles = {
     opacity: 0.9,
   },
   link: {
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
     textDecoration: "underline",
     cursor: "pointer",
   },
@@ -470,91 +470,12 @@ const styles = {
     margin: "0 auto 20px auto",
     padding: "0",
     textAlign: "center",
-    color: "#facbb8",
+    color: "var(--theme-ground-text-secondary)",
   },
   cardGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: "16px",
-  },
-  card: {
-    background: "rgba(255, 255, 255, 0.04)",
-    borderRadius: "16px",
-    padding: "12px 14px",
-    border: "1px solid rgba(255, 255, 255, 0.07)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "14px",
-  },
-  cardTitleLink: {
-    color: "#feefd0",
-    textDecoration: "none",
-  },
-  pillLink: {
-    textDecoration: "none",
-    color: "#f9f5ff",
-  },
-  pill: {
-    fontSize: "13px",
-    fontWeight: 400,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    padding: "3px 8px",
-    borderRadius: "999px",
-    background: "rgba(255, 180, 150, 0.16)",
-    border: "1px solid rgba(255, 180, 150, 0.7)",
-    color: "#feefd0",
-  },
-  imageLink: {
-    fontSize: "13px",
-    textDecoration: "underline",
-    color: "#feefd0",
-  },
-  cardFooter: {
-    marginTop: "4px",
-    fontSize: "11px",
-    opacity: 0.7,
-  },
-  voteRow: {
-    marginTop: "10px",
-    display: "flex",
-    gap: "8px",
-  },
-  voteButton: {
-    flex: 1,
-    borderRadius: "999px",
-    padding: "6px 0",
-    fontSize: "13px",
-    fontWeight: 400,
-    letterSpacing: "0.04em",
-    border: "1px solid rgba(255, 255, 255, 0.35)",
-    background: "rgba(0, 0, 0, 0.35)",
-    color: "#f9f5ff",
-    cursor: "pointer",
-  },
-  voteButtonActiveToot: {
-    background: "rgba(120, 237, 173, 0.9)",
-    borderColor: "rgba(120, 237, 173, 1)",
-    color: "#052417",
-    fontWeight: 600,
-  },
-  voteButtonActiveBoot: {
-    background: "rgba(255, 154, 162, 0.9)",
-    borderColor: "rgba(255, 154, 162, 1)",
-    color: "#3a0610",
-    fontWeight: 600,
-  },
-  voteNote: {
-    marginTop: "4px",
-    fontSize: "12px",
-    opacity: 0.9,
   },
   approvalHeaderContainer: {
     display: "flex",
@@ -569,8 +490,8 @@ const styles = {
     textAlign: "center",
     padding: "12px 16px",
     borderRadius: "12px",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    background: "rgba(255, 195, 205, 0.12)",
+    border: "2px solid var(--theme-element-border)",
+    background: "var(--theme-element-fill)",
     minWidth: "188px",
   },
   queenStatColMobile: {
@@ -581,14 +502,14 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     marginBottom: "6px",
     fontFamily: "Oswald, sans-serif",
   },
   statValue: {
     fontSize: "28px",
     fontWeight: 600,
-    color: "#feefd0",
+    color: "var(--theme-element-text-primary)",
     fontFamily: "Oswald, sans-serif",
     marginBottom: "6px",
   },
@@ -596,7 +517,7 @@ const styles = {
     fontSize: "14px",
     fontWeight: 400,
     letterSpacing: "0.04em",
-    color: "#facbb8",
+    color: "var(--theme-element-text-secondary)",
     fontFamily: "Oswald, sans-serif",
     marginTop: "6px",
     whiteSpace: "nowrap",
@@ -616,9 +537,9 @@ const styles = {
     fontWeight: 400,
     letterSpacing: "0.04em",
     borderRadius: "16px",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
-    background: "rgba(255, 195, 205, 0.12)",
-    color: "#feefd0",
+    border: "2px solid var(--theme-element-border)",
+    background: "var(--theme-element-fill)",
+    color: "var(--theme-element-text-primary)",
     cursor: "pointer",
     fontFamily: "Oswald, sans-serif",
     outline: "none",
@@ -642,8 +563,8 @@ const styles = {
     left: "50%",
     transform: "translateX(-50%)",
     width: "240px",
-    background: "#0f0804",
-    border: "2px solid rgba(255, 180, 150, 0.35)",
+    background: "var(--theme-page-background)",
+    border: "2px solid var(--theme-element-border)",
     borderRadius: "16px",
     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
     zIndex: 1100,
@@ -653,7 +574,7 @@ const styles = {
     display: "block",
     width: "100%",
     padding: "8px 14px",
-    color: "#feefd0",
+    color: "var(--theme-ground-text-primary)",
     background: "transparent",
     border: "none",
     fontSize: "14px",
