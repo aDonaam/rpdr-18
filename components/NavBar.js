@@ -142,7 +142,6 @@ export default function NavBar({ seasonNav }) {
                   ...styles.navLink,
                   ...(isMobile ? styles.navLinkMobile : {}),
                   ...styles.dropdownButton,
-                  ...(openMenu === "queens" ? styles.dropdownButtonActive : {}),
                 }}
               >
                 Queens
@@ -176,7 +175,6 @@ export default function NavBar({ seasonNav }) {
                   ...styles.navLink,
                   ...(isMobile ? styles.navLinkMobile : {}),
                   ...styles.dropdownButton,
-                  ...(openMenu === "categories" ? styles.dropdownButtonActive : {}),
                 }}
               >
                 Categories
@@ -420,11 +418,6 @@ const styles = {
     fontFamily: "inherit",
     fontWeight: 400,
     letterSpacing: "0.06em",
-  },
-
-  dropdownButtonActive: {
-    background: "rgba(244, 194, 122, 0.15)",
-    border: "1px solid rgba(244, 194, 122, 0.3)",
   },
 
   dropdownArrow: {

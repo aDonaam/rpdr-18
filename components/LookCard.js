@@ -117,10 +117,10 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
             style={{ ...styles.queenName, cursor: "pointer" }}
             onClick={goToQueen}
           >
-            {look.appearanceDisplayName || look.display_name}
+            {look.display_name || look.appearanceDisplayName}
           </span>
         ) : (
-          <span style={styles.queenName}>{look.appearanceDisplayName || look.display_name}</span>
+          <span style={styles.queenName}>{look.display_name || look.appearanceDisplayName}</span>
         )}
       </div>
 
@@ -153,7 +153,7 @@ export default function LookCard({ look, userVote = null, onVote, headerMode = "
         >
           <img
             src={look.image_path}
-            alt={`${look.appearanceDisplayName || look.display_name} – ${look.categoryDisplayName}`}
+            alt={`${look.display_name || look.appearanceDisplayName} – ${look.categoryDisplayName}`}
             style={styles.image}
             onError={() => setImgFailed(true)}
           />

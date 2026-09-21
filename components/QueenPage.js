@@ -416,10 +416,7 @@ export default function QueenPage({ initialLooks, queenName: initialQueenName, q
             type="button"
             ref={sortBtnRef}
             onClick={() => setSortMenuOpen(!sortMenuOpen)}
-            style={{
-              ...styles.sorterButton,
-              ...(sortMenuOpen ? styles.sorterButtonActive : {}),
-            }}
+            style={styles.sorterButton}
           >
             {sortOption === "chronological" ? "Chronological" : "Highest Public Approval"}
             <span style={styles.sorterArrow}>▼</span>
@@ -634,10 +631,6 @@ const styles = {
     transition: "all 0.15s ease",
     minWidth: "240px",
     justifyContent: "center",
-  },
-  sorterButtonActive: {
-    background: "rgba(255, 195, 205, 0.18)",
-    border: "2px solid rgba(255, 180, 150, 0.45)",
   },
   sorterArrow: {
     fontSize: "11px",
