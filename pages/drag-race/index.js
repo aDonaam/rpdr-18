@@ -74,9 +74,16 @@ export default function DragRaceProjectHome({ seasons }) {
               <Link
                 key={`${s.franchiseSlug}-${s.seasonNumber}`}
                 href={seasonRoute(s.franchiseSlug, s.seasonNumber)}
-                style={styles.seasonLink}
+                style={{
+                  ...styles.seasonLink,
+                  ...(s.theme && {
+                    borderColor: s.theme.elementBorder,
+                    background: s.theme.elementFill,
+                  }),
+                }}
               >
-                {s.franchiseName} — Season {s.seasonNumber}
+                <span style={{ color: s.theme?.elementTextPrimary }}>{s.franchiseName} — </span>
+                <span style={{ color: s.theme?.elementTextSecondary }}>Season {s.seasonNumber}</span>
               </Link>
             ))
           )}
@@ -151,7 +158,7 @@ const styles = {
     display: "inline-block",
     padding: "9px 18px",
     borderRadius: "8px",
-    border: "1px solid #f2f0eb",
+    border: "2px solid #f2f0eb",
     background: "#202020",
     color: "#f2f0eb",
     textDecoration: "none",
@@ -178,7 +185,7 @@ const styles = {
     width: "fit-content",
     padding: "13px 20px",
     borderRadius: "8px",
-    border: "1px solid #f2f0eb",
+    border: "2px solid #f2f0eb",
     background: "#202020",
     color: "#f2f0eb",
     textDecoration: "none",

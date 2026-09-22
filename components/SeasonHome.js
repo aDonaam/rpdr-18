@@ -38,16 +38,16 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
   // Mobile table styles
   const mobileTableStyles = {
     rankCol: { width: "28px", paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", fontSize: "14px", verticalAlign: "middle", textAlign: "center", fontWeight: 600 },
-    rankBadge: { display: "inline-block", fontSize: "13px", paddingTop: "4px", paddingRight: "4px", paddingBottom: "4px", paddingLeft: "4px", borderRadius: "8px", background: "var(--theme-stacked-element-fill)", border: "2px solid var(--theme-element-border)", color: "var(--theme-stacked-element-text)", fontWeight: 600, width: "14px", textAlign: "center" },
+    rankBadge: { display: "inline-block", fontSize: "13px", paddingTop: "4px", paddingRight: "4px", paddingBottom: "4px", paddingLeft: "4px", borderRadius: "8px", background: "var(--theme-stacked-element-fill)", border: "2px solid var(--theme-element-border)", color: "var(--theme-stacked-element-text)", fontWeight: 700, width: "14px", textAlign: "center" },
     imageCol: { width: "40px", paddingTop: "7px", paddingRight: "2px", paddingBottom: "5px", paddingLeft: "2px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" },
     nameCol: { paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", width: "auto", verticalAlign: "middle", textAlign: "center" },
     approvalCol: { width: "60px", paddingTop: "6px", paddingRight: "0px", paddingBottom: "6px", paddingLeft: "0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
     votesCol: { width: "64px", paddingTop: "6px", paddingRight: "0px", paddingBottom: "6px", paddingLeft: "0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
-    nameLink: { fontSize: "13px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.2", textAlign: "center" },
-    userNameLink: { fontSize: "13px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.2", textAlign: "center" },
+    nameLink: { fontSize: "13px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.2", textAlign: "center", textWrap: "balance" },
+    userNameLink: { fontSize: "13px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.2", textAlign: "center", textWrap: "balance" },
     row: { height: "40px" },
     categoryNameCol: { paddingTop: "8px", paddingRight: "12px", paddingBottom: "8px", paddingLeft: "12px", width: "auto", verticalAlign: "middle", textAlign: "center" },
-    categoryNameLink: { fontSize: "12px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.3", textAlign: "center" },
+    categoryNameLink: { fontSize: "12px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.3", textAlign: "center", textWrap: "balance" },
     thumb: { width: 32, height: 32, borderRadius: 8 },
     userBiasThumb: { width: 32, height: 32, borderRadius: 7 },
     userRow: { height: "40px" },
@@ -612,6 +612,7 @@ const styles = {
     cursor: "pointer",
     textDecoration: "none",
     display: "inline-block",
+    textWrap: "balance",
   },
   userNameLink: {
     fontSize: "24px",
@@ -621,6 +622,7 @@ const styles = {
     cursor: "pointer",
     textDecoration: "none",
     display: "inline-block",
+    textWrap: "balance",
   },
   categoryNameLink: {
     fontSize: "24px",
@@ -635,6 +637,7 @@ const styles = {
     maxWidth: "320px",
     lineHeight: "1.2",
     whiteSpace: "normal",
+    textWrap: "balance",
   },
   approvalBadge: {
     display: "inline-block",
@@ -647,6 +650,7 @@ const styles = {
     background: "var(--theme-stacked-element-fill)",
     border: "2px solid var(--theme-element-border)",
     color: "var(--theme-stacked-element-text)",
+    fontWeight: 500,
     width: "76px",
     textAlign: "center",
   },
@@ -661,7 +665,7 @@ const styles = {
     border: "2px solid var(--theme-element-border)",
     color: "var(--theme-stacked-element-text)",
     fontSize: "12px",
-    fontWeight: 200,
+    fontWeight: 400,
     width: "48px"
   },
   userVotesBadge: {
@@ -675,7 +679,7 @@ const styles = {
     border: "2px solid var(--theme-element-border)",
     color: "var(--theme-stacked-element-text)",
     fontSize: "16px",
-    fontWeight: 200,
+    fontWeight: 400,
     width: "auto"
   },
   rankBadge: {
@@ -689,7 +693,7 @@ const styles = {
     background: "var(--theme-stacked-element-fill)",
     border: "2px solid var(--theme-element-border)",
     color: "var(--theme-stacked-element-text)",
-    fontWeight: 400,
+    fontWeight: 500,
     width: "20px",
     textAlign: "center",
   },

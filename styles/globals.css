@@ -92,6 +92,16 @@ a:visited {
   text-decoration: none !important;
 }
 
+/* Mouse interaction must not introduce the browser's native dark focus ring. */
+.look-card__vote-button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.look-card__vote-button:focus-visible {
+  outline: 2px solid var(--theme-element-text-secondary);
+  outline-offset: 2px;
+}
+
 /* ===== Browser Autofill Styling ===== */
 /* Override Chrome's default autofill appearance */
 input:-webkit-autofill,
