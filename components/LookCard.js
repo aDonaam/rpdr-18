@@ -1,7 +1,7 @@
 // components/LookCard.js
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { seasonQueenRoute, seasonCategoryRoute } from "../lib/routeHelpers";
 
 const QUEEN_NAME_FONT_SIZE = 19;
@@ -69,8 +69,23 @@ function ShrinkToFitName({ children, onClick }) {
 
 function LookImagePreview({ src, alt }) {
   const [status, setStatus] = useState(src ? "loading" : "missing");
+  const imageRef = useRef(null);
 
-  if (!src) {
+  const markFailed = useCallback((image) => {
+    if (!image) return;
+
+    image.style.visibility = "hidden";
+    setStatus("failed");
+  }, []);
+
+  useLayoutEffect(() => {
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth === 0) {
+      markFailed(image);
+    }
+  }, [markFailed]);
+
+  if (!src || status === "failed") {
     return (
       <div suppressHydrationWarning style={styles.comingSoonLabel}>
         COMING SOON
@@ -80,10 +95,17 @@ function LookImagePreview({ src, alt }) {
 
   return (
     <>
-      <a href={src} target="_blank" rel="noreferrer" style={styles.imageLink}>
+      <a
+        href={src}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={alt}
+        style={styles.imageLink}
+      >
         <img
+          ref={imageRef}
           src={src}
-          alt={alt}
+          alt=""
           width="764"
           height="1079"
           decoding="async"
@@ -93,16 +115,10 @@ function LookImagePreview({ src, alt }) {
           }}
           onLoad={() => setStatus("loaded")}
           onError={(event) => {
-            event.currentTarget.style.visibility = "hidden";
-            setStatus("failed");
+            markFailed(event.currentTarget);
           }}
         />
       </a>
-      {status === "failed" && (
-        <div suppressHydrationWarning style={styles.comingSoonLabel}>
-          COMING SOON
-        </div>
-      )}
     </>
   );
 }
@@ -214,7 +230,11 @@ function CategoryPill({ categoryName, categoryHref, categoryIsLink }) {
         <Link href={categoryHref} style={styles.pillLink}>
           {categoryPill}
         </Link>
-      ) : categoryPill}
+      ) : (
+        // Keep the non-link category-page pill in the same inline formatting
+        // wrapper as the linked variants so its metadata geometry is identical.
+        <span style={styles.pillLink}>{categoryPill}</span>
+      )}
       <span
         ref={expandedProbeRef}
         aria-hidden="true"
@@ -532,7 +552,7 @@ const styles = {
     width: "100%",
     maxWidth: "290px",
     aspectRatio: "764 / 1079",
-    background: "var(--theme-stacked-element-fill)",
+    background: "var(--theme-page-background)",
     position: "relative",
     flexShrink: 0,
   },
@@ -547,7 +567,7 @@ const styles = {
     width: "100%",
     height: "100%",
     objectFit: "cover",
-    background: "var(--theme-stacked-element-fill)",
+    background: "var(--theme-page-background)",
   },
   comingSoonLabel: {
     position: "absolute",
