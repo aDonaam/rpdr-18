@@ -30,8 +30,8 @@ export default function UserPage({ username, displayUsername, rows, categories, 
   // Mobile table styles
   const mobileTableStyles = {
     rankCol: { width: "28px", paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", fontSize: "14px", verticalAlign: "middle", textAlign: "center", fontWeight: 600 },
-    rankBadge: { display: "inline-block", fontSize: "13px", paddingTop: "4px", paddingRight: "4px", paddingBottom: "4px", paddingLeft: "4px", borderRadius: "8px", background: "var(--theme-stacked-element-fill)", border: "2px solid var(--theme-element-border)", color: "var(--theme-stacked-element-text)", fontWeight: 700, width: "14px", textAlign: "center" },
-    imageCol: { width: "40px", paddingTop: "7px", paddingRight: "2px", paddingBottom: "5px", paddingLeft: "2px", verticalAlign: "middle", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" },
+    rankBadge: { display: "inline-block", fontSize: "13px", paddingTop: "4px", paddingRight: "4px", paddingBottom: "4px", paddingLeft: "4px", borderRadius: "8px", background: "var(--theme-page-background)", border: "2px solid var(--theme-element-border)", color: "var(--theme-ground-text-secondary)", fontWeight: 700, width: "14px", textAlign: "center", verticalAlign: "middle" },
+    imageCol: { width: "40px", paddingTop: "6px", paddingRight: "2px", paddingBottom: "6px", paddingLeft: "2px", verticalAlign: "middle", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" },
     nameCol: { paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", width: "auto", verticalAlign: "middle", textAlign: "center" },
     approvalCol: { width: "60px", paddingTop: "6px", paddingRight: "0px", paddingBottom: "6px", paddingLeft: "0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
     votesCol: { width: "64px", paddingTop: "6px", paddingRight: "0px", paddingBottom: "6px", paddingLeft: "0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
@@ -39,8 +39,8 @@ export default function UserPage({ username, displayUsername, rows, categories, 
     row: { height: "40px" },
     thumb: { width: 32, height: 32, borderRadius: 8 },
     avatarPlaceholder: { width: 32, height: 32, borderRadius: 8, fontSize: "8px" },
-    approvalBadge: { fontSize: "13px", width: "44px", paddingTop: "2px", paddingRight: "0px", paddingBottom: "2px", paddingLeft: "0px", borderRadius: "8px" },
-    votesBadge: { fontSize: "10px", width: "32px", paddingTop: "2px", paddingRight: "4px", paddingBottom: "2px", paddingLeft: "4px", borderRadius: "8px" },
+    approvalBadge: { fontSize: "13px", width: "44px", paddingTop: "2px", paddingRight: "0px", paddingBottom: "2px", paddingLeft: "0px", borderRadius: "8px", verticalAlign: "middle" },
+    votesBadge: { fontSize: "10px", width: "37px", height: "28px", boxSizing: "border-box", padding: "0px", lineHeight: "1.1", borderRadius: "8px", verticalAlign: "middle" },
     rankColHeader: { width: "28px", paddingTop: "8px", paddingRight: "4px", paddingBottom: "10px", paddingLeft: "4px", fontSize: "13px", verticalAlign: "middle", textAlign: "center", fontWeight: 700 },
     imageColHeader: { width: "40px", paddingTop: "6px", paddingRight: "2px", paddingBottom: "8px", paddingLeft: "2px", verticalAlign: "middle", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" },
     nameColHeader: { paddingTop: "8px", paddingRight: "4px", paddingBottom: "10px", paddingLeft: "4px", width: "auto", verticalAlign: "middle", textAlign: "center", fontSize: "13px" },
@@ -145,7 +145,7 @@ export default function UserPage({ username, displayUsername, rows, categories, 
                       </td>
                       <td style={mergeStyles(styles.votesCol, mobileTableStyles.votesCol)}>
                         <span style={mergeStyles(styles.votesBadge, mobileTableStyles.votesBadge)}>
-                          {q.totalVotes} {q.totalVotes === 1 ? "vote" : "votes"}
+                          <><span style={{ flexShrink: 0 }}>{q.totalVotes}</span><span style={{ flexShrink: 0 }}>votes</span></>
                         </span>
                       </td>
                     </tr>
@@ -214,7 +214,7 @@ export default function UserPage({ username, displayUsername, rows, categories, 
                       </td>
                       <td style={mergeStyles(styles.votesCol, mobileTableStyles.votesCol)}>
                         <span style={mergeStyles(styles.votesBadge, mobileTableStyles.votesBadge)}>
-                          {c.totalVotes} {c.totalVotes === 1 ? "vote" : "votes"}
+                          <><span style={{ flexShrink: 0 }}>{c.totalVotes}</span><span style={{ flexShrink: 0 }}>votes</span></>
                         </span>
                       </td>
                     </tr>
@@ -244,12 +244,13 @@ const styles = {
     paddingBottom: "4px",
     paddingLeft: "8px",
     borderRadius: "12px",
-    background: "var(--theme-stacked-element-fill)",
+    background: "var(--theme-page-background)",
     border: "2px solid var(--theme-element-border)",
-    color: "var(--theme-stacked-element-text)",
+    color: "var(--theme-ground-text-secondary)",
     fontWeight: 500,
     width: "20px",
     textAlign: "center",
+    verticalAlign: "middle",
   },
   approvalLabel: {
     fontSize: "13px",
@@ -338,6 +339,7 @@ const styles = {
     paddingLeft: "16px",
     fontWeight: 500,
     textAlign: "center",
+    verticalAlign: "middle",
     fontSize: "24px",
     color: "var(--theme-element-text-primary)",
   },
@@ -349,6 +351,7 @@ const styles = {
     paddingLeft: "16px",
     fontWeight: 500,
     textAlign: "center",
+    verticalAlign: "middle",
     fontSize: "20px",
     fontStyle: "italic",
     color: "var(--theme-element-text-secondary)",
@@ -371,6 +374,7 @@ const styles = {
     paddingBottom: "16px",
     paddingLeft: "8px",
     textAlign: "center",
+    verticalAlign: "middle",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -381,6 +385,7 @@ const styles = {
     paddingBottom: "12px",
     paddingLeft: "16px",
     textAlign: "center",
+    verticalAlign: "middle",
     width: "300px",
   },
   nameColHeader: {
@@ -389,6 +394,7 @@ const styles = {
     paddingBottom: "16px",
     paddingLeft: "16px",
     textAlign: "center",
+    verticalAlign: "middle",
     width: "300px",
     fontSize: "20px",
     fontWeight: 500,
@@ -411,6 +417,7 @@ const styles = {
     paddingBottom: "16px",
     paddingLeft: "16px",
     textAlign: "center",
+    verticalAlign: "middle",
     width: "394px",
     fontSize: "20px",
     fontWeight: 500,
@@ -424,6 +431,7 @@ const styles = {
     paddingBottom: "12px",
     paddingLeft: "0px",
     textAlign: "center",
+    verticalAlign: "middle",
   },
   approvalColHeader: {
     width: "120px",
@@ -432,6 +440,7 @@ const styles = {
     paddingBottom: "16px",
     paddingLeft: "0px",
     textAlign: "center",
+    verticalAlign: "middle",
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
@@ -444,6 +453,7 @@ const styles = {
     paddingBottom: "12px",
     paddingLeft: "0px",
     textAlign: "center",
+    verticalAlign: "middle",
   },
   votesColHeader: {
     width: "100px",
@@ -452,6 +462,7 @@ const styles = {
     paddingBottom: "16px",
     paddingLeft: "0px",
     textAlign: "center",
+    verticalAlign: "middle",
     fontSize: "20px",
     fontWeight: 500,
     fontStyle: "italic",
@@ -484,6 +495,7 @@ const styles = {
     cursor: "pointer",
     textDecoration: "none",
     display: "inline-block",
+    textAlign: "center",
     textWrap: "balance",
   },
   categoryNameLink: {
@@ -495,6 +507,7 @@ const styles = {
     cursor: "pointer",
     textDecoration: "none",
     display: "inline-block",
+    textAlign: "center",
     wordBreak: "break-word",
     maxWidth: "320px",
     lineHeight: "1.2",
@@ -515,20 +528,25 @@ const styles = {
     fontWeight: 500,
      width: "76px",
      textAlign: "center",
+     verticalAlign: "middle",
   },
   votesBadge: {
-    display: "inline-block",
-    paddingTop: "4px",
-    paddingRight: "10px",
-    paddingBottom: "4px",
-    paddingLeft: "10px",
+    display: "inline-flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "52px",
+    height: "42px",
+    boxSizing: "border-box",
+    padding: "0px",
     borderRadius: "10px",
-   background: "var(--theme-stacked-element-fill)",
+   background: "var(--theme-page-background)",
     border: "2px solid var(--theme-element-border)",
-    color: "var(--theme-stacked-element-text)",
-    width: "48px",
+    color: "var(--theme-ground-text-secondary)",
     fontSize: "12px",
     fontWeight: 400,
+    lineHeight: "1.1",
+    verticalAlign: "middle",
   },
   thumb: {
     width: 60,
