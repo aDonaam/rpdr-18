@@ -40,10 +40,10 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
     rankCol: { width: "28px", paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", fontSize: "14px", verticalAlign: "middle", textAlign: "center", fontWeight: 600 },
     rankBadge: { display: "inline-block", fontSize: "13px", paddingTop: "4px", paddingRight: "4px", paddingBottom: "4px", paddingLeft: "4px", borderRadius: "8px", background: "var(--theme-page-background)", border: "2px solid var(--theme-element-border)", color: "var(--theme-ground-text-secondary)", fontWeight: 700, width: "14px", textAlign: "center", verticalAlign: "middle" },
     imageCol: { width: "40px", paddingTop: "6px", paddingRight: "2px", paddingBottom: "6px", paddingLeft: "2px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center" },
-    nameCol: { paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", width: "auto", verticalAlign: "middle", textAlign: "center" },
+    nameCol: { paddingTop: "6px", paddingRight: "4px", paddingBottom: "6px", paddingLeft: "4px", width: "auto", verticalAlign: "middle", textAlign: "center", overflow: "hidden" },
     approvalCol: { width: "60px", paddingTop: "6px", paddingRight: "0px", paddingBottom: "6px", paddingLeft: "0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
     votesCol: { width: "64px", paddingTop: "6px", paddingRight: "0px", paddingBottom: "6px", paddingLeft: "0px", fontSize: "12px", verticalAlign: "middle", textAlign: "center" },
-    nameLink: { fontSize: "13px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.2", textAlign: "center", textWrap: "balance" },
+    nameLink: { fontSize: "13px", wordBreak: "break-word", maxWidth: "100%", height: "28px", lineHeight: "1.05", overflow: "hidden", whiteSpace: "normal", textAlign: "center", textWrap: "balance" },
     userNameLink: { fontSize: "13px", wordBreak: "break-word", whiteSpace: "normal", lineHeight: "1.2", textAlign: "center", textWrap: "balance" },
     row: { height: "40px" },
     categoryNameCol: { paddingTop: "8px", paddingRight: "12px", paddingBottom: "8px", paddingLeft: "12px", width: "auto", verticalAlign: "middle", textAlign: "center" },
@@ -135,11 +135,12 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                             alt={`${q.appearanceDisplayName} thumbnail`}
                             style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
                             onError={(e) => {
-                              e.currentTarget.src = `/thumbnails/queens/_default.jpg`;
+                              e.currentTarget.removeAttribute("src");
+                              e.currentTarget.style.backgroundColor = "var(--theme-stacked-element-fill)";
                             }}
                           />
                         ) : (
-                          <div style={mergeStyles(styles.avatarPlaceholder, mobileTableStyles.avatarPlaceholder)}>No image</div>
+                          <div style={{ ...mergeStyles(styles.thumb, mobileTableStyles.thumb), backgroundColor: "var(--theme-stacked-element-fill)" }} />
                         )}
                       </td>
                       <td style={mergeStyles(styles.nameCol, mobileTableStyles.nameCol)}>
@@ -304,15 +305,18 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                           const favoriteQueenData = initialLooks.find((q) => q.slug === user.favorite_queen);
                           const imagePath = favoriteQueenData?.image_path || null;
                           const queenSlug = favoriteQueenData?.slug || user.favorite_queen;
-                          return (
+                          return imagePath ? (
                             <img
                               src={getQueenImagePath(imagePath, queenSlug, "")}
                               alt={`${favoriteQueenData?.appearanceDisplayName || user.favorite_queen} thumbnail`}
                               style={mergeStyles(styles.userBiasThumb, mobileTableStyles.userBiasThumb)}
                               onError={(e) => {
-                                e.currentTarget.src = `/thumbnails/queens/_default.jpg`;
+                                e.currentTarget.removeAttribute("src");
+                                e.currentTarget.style.backgroundColor = "var(--theme-stacked-element-fill)";
                               }}
                             />
+                          ) : (
+                            <div style={{ ...mergeStyles(styles.userBiasThumb, mobileTableStyles.userBiasThumb), backgroundColor: "var(--theme-stacked-element-fill)" }} />
                           );
                         })() : (
                           <div style={mergeStyles(styles.avatarPlaceholder, mobileTableStyles.avatarPlaceholder)}>No fave</div>
@@ -489,6 +493,7 @@ const styles = {
     textAlign: "center",
     verticalAlign: "middle",
     width: "300px",
+    overflow: "hidden",
   },
   userNameCol: {
     paddingTop: "8px",
@@ -627,7 +632,16 @@ const styles = {
     color: "var(--theme-element-text-primary)",
     cursor: "pointer",
     textDecoration: "none",
-    display: "inline-block",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    wordBreak: "break-word",
+    maxWidth: "268px",
+    height: "60px",
+    lineHeight: "1.2",
+    overflow: "hidden",
+    whiteSpace: "normal",
     textAlign: "center",
     textWrap: "balance",
   },
