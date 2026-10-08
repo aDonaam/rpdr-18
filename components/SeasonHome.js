@@ -11,6 +11,7 @@
  */
 
 import React from "react";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { seasonQueenRoute, seasonCategoryRoute, seasonUserRoute } from "../lib/routeHelpers";
 import { getQueenImagePath } from "../lib/queenImagePath";
@@ -130,15 +131,28 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                       </td>
                       <td style={mergeStyles(styles.imageCol, mobileTableStyles.imageCol)}>
                         {q.image_path ? (
-                          <img
-                            src={getQueenImagePath(q.image_path, q.slug, "")}
-                            alt={`${q.appearanceDisplayName} thumbnail`}
-                            style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
-                            onError={(e) => {
-                              e.currentTarget.removeAttribute("src");
-                              e.currentTarget.style.backgroundColor = "var(--theme-stacked-element-fill)";
-                            }}
-                          />
+                          (() => {
+                            const image = (
+                              <img
+                                src={getQueenImagePath(q.image_path, q.slug, "")}
+                                alt={`${q.appearanceDisplayName} thumbnail`}
+                                style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
+                                onError={(e) => {
+                                  e.currentTarget.removeAttribute("src");
+                                  e.currentTarget.style.backgroundColor = "var(--theme-stacked-element-fill)";
+                                }}
+                              />
+                            );
+                            return franchiseSlug && seasonNumber != null && q.slug ? (
+                              <Link
+                                href={seasonQueenRoute(franchiseSlug, seasonNumber, q.slug)}
+                                aria-label={`View ${q.appearanceDisplayName} in Season ${seasonNumber}`}
+                                style={styles.thumbnailLink}
+                              >
+                                {image}
+                              </Link>
+                            ) : image;
+                          })()
                         ) : (
                           <div style={{ ...mergeStyles(styles.thumb, mobileTableStyles.thumb), backgroundColor: "var(--theme-stacked-element-fill)" }} />
                         )}
@@ -305,7 +319,13 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                           const favoriteQueenData = initialLooks.find((q) => q.slug === user.favorite_queen);
                           const imagePath = favoriteQueenData?.image_path || null;
                           const queenSlug = favoriteQueenData?.slug || user.favorite_queen;
-                          return imagePath ? (
+                          if (!imagePath) {
+                            return (
+                              <div style={{ ...mergeStyles(styles.userBiasThumb, mobileTableStyles.userBiasThumb), backgroundColor: "var(--theme-stacked-element-fill)" }} />
+                            );
+                          }
+
+                          const image = (
                             <img
                               src={getQueenImagePath(imagePath, queenSlug, "")}
                               alt={`${favoriteQueenData?.appearanceDisplayName || user.favorite_queen} thumbnail`}
@@ -315,9 +335,16 @@ export default function SeasonHome({ initialLooks, initialCategories, initialUse
                                 e.currentTarget.style.backgroundColor = "var(--theme-stacked-element-fill)";
                               }}
                             />
-                          ) : (
-                            <div style={{ ...mergeStyles(styles.userBiasThumb, mobileTableStyles.userBiasThumb), backgroundColor: "var(--theme-stacked-element-fill)" }} />
                           );
+                          return franchiseSlug && seasonNumber != null && queenSlug ? (
+                            <Link
+                              href={seasonQueenRoute(franchiseSlug, seasonNumber, queenSlug)}
+                              aria-label={`View ${favoriteQueenData?.appearanceDisplayName || user.favorite_queen} in Season ${seasonNumber}`}
+                              style={styles.thumbnailLink}
+                            >
+                              {image}
+                            </Link>
+                          ) : image;
                         })() : (
                           <div style={mergeStyles(styles.avatarPlaceholder, mobileTableStyles.avatarPlaceholder)}>No fave</div>
                         )}
@@ -762,6 +789,10 @@ const styles = {
     background: "var(--theme-stacked-element-fill)",
     border: "2px solid var(--theme-element-border)",
     flex: "0 0 auto",
+  },
+  thumbnailLink: {
+    display: "inline-flex",
+    cursor: "pointer",
   },
   userRow: {
     height: "44px",

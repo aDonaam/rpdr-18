@@ -9,6 +9,7 @@
  */
 
 import React from "react";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { seasonQueenRoute, seasonCategoryRoute } from "../lib/routeHelpers";
 import { getQueenImagePath } from "../lib/queenImagePath";
@@ -114,15 +115,28 @@ export default function UserPage({ username, displayUsername, rows, categories, 
                       </td>
                       <td style={mergeStyles(styles.imageCol, mobileTableStyles.imageCol)}>
                         {q.image_path ? (
-                          <img
-                            src={getQueenImagePath(q.image_path, q.slug, "")}
-                            alt={`${q.appearanceDisplayName} thumbnail`}
-                            style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
-                            onError={(e) => {
-                              e.currentTarget.removeAttribute("src");
-                              e.currentTarget.style.backgroundColor = "var(--theme-stacked-element-fill)";
-                            }}
-                          />
+                          (() => {
+                            const image = (
+                              <img
+                                src={getQueenImagePath(q.image_path, q.slug, "")}
+                                alt={`${q.appearanceDisplayName} thumbnail`}
+                                style={mergeStyles(styles.thumb, mobileTableStyles.thumb)}
+                                onError={(e) => {
+                                  e.currentTarget.removeAttribute("src");
+                                  e.currentTarget.style.backgroundColor = "var(--theme-stacked-element-fill)";
+                                }}
+                              />
+                            );
+                            return franchiseSlug && seasonNumber != null && q.slug ? (
+                              <Link
+                                href={seasonQueenRoute(franchiseSlug, seasonNumber, q.slug)}
+                                aria-label={`View ${q.appearanceDisplayName} in Season ${seasonNumber}`}
+                                style={styles.thumbnailLink}
+                              >
+                                {image}
+                              </Link>
+                            ) : image;
+                          })()
                         ) : (
                           <div style={{ ...mergeStyles(styles.thumb, mobileTableStyles.thumb), backgroundColor: "var(--theme-stacked-element-fill)" }} />
                         )}
@@ -237,6 +251,10 @@ export default function UserPage({ username, displayUsername, rows, categories, 
 }
 
 const styles = {
+  thumbnailLink: {
+    display: "inline-flex",
+    cursor: "pointer",
+  },
   rankBadge: {
     display: "inline-block",
     fontSize: "20px",
